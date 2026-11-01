@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import time
 from pathlib import Path
 
@@ -11,6 +12,12 @@ from .i18n import tr
 from .state import RunState
 
 WARNING_PREFIXES = ("UYARI", "WARNING")     # state.notes iki dilde de kaydedilmiş olabilir
+_NOTE_STAMP = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ")     # RunState.note() her nota tarih ekler
+
+
+def is_warning(note: str) -> bool:
+    """Not bir uyarı mı? (başındaki tarih damgası yok sayılır; Türkçe ve İngilizce kayıtlar tanınır)"""
+    return _NOTE_STAMP.sub("", note, count=1).startswith(WARNING_PREFIXES)
 
 
 
@@ -78,7 +85,7 @@ def build_report(st: RunState, cfg) -> tuple:
     lines.append(tr("BIOS'a girmeden geçici uygulamak için (yeniden başlatınca silinir):"))
     lines.append(tr("  python -m pbo_tuner apply          # veya: ryzen-smu-cli.exe --offset {vals}", vals=vals))
     lines.append("")
-    warns = [n for n in st.notes if n.startswith(WARNING_PREFIXES)]
+    warns = [n for n in st.notes if is_warning(n)]
     if warns:
         lines.append(tr("UYARILAR:"))
         lines += [f"  {w}" for w in warns]

@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+from pbo_tuner import __main__ as cli
 from pbo_tuner.config import Config, ConfigError
 from pbo_tuner.hw import Pulser, ToolError
 from pbo_tuner.report import build_report
@@ -201,4 +202,76 @@ def test_pulser_skips_processes_that_fail_to_suspend():
 def test_menu_has_lowload_entry_and_command_parses():
     from pbo_tuner import __main__ as cli
     assert any(cmd == ["lowload"] for _, cmd in cli.MENU)
-    assert cli.MENU[-1][1] == ["lowload"]                      # önceki numaralar değişmedi (1-10)
+    assert cli.MENU[10][1] == ["lowload"]                       # önceki numaralar değişmedi (1-11)
+    assert cli.MENU[-1][1] == ["share"]                         # 12 = share
+
+
+# ----------------------------------------------------------------------------- lowload komutu (CLI)
+def cli_args(tmp_path, **kw):
+    from types import SimpleNamespace
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(f"[paths]\ndata_dir = '{tmp_path / 'data'}'\n", encoding="utf-8")
+    return SimpleNamespace(config=str(cfg_path), seconds=None, idle_minutes=None, yes=True, **kw)
+
+
+def seed_state(tmp_path, stage):
+    from pbo_tuner.state import RunState, StateStore
+    cfg = Config(data_dir=str(tmp_path / "data"))
+    st = RunState(4, search_params(cfg))
+    st.stage, st.final = stage, {0: 10, 1: 20, 2: 5, 3: 0}
+    store = StateStore(cfg.data_path / "state.json")
+    store.save(st)
+    return cfg, store
+
+
+def test_cli_lowload_resumes_an_unfinished_lowload_instead_of_refusing(tmp_path, monkeypatch, capsys):
+    """Gerçek olay: ilk deneme yönetici olmayan pencerede hazırlığı yapıp durdu; ikinci denemede "önce normal çalışma
+    bitmeli" deyip reddetti. Artık kaldığı yerden devam eder."""
+    cfg, store = seed_state(tmp_path, STAGE_DONE)
+    prepare_lowload(cfg, store)                                       # hazırlık yapıldı ama test hiç çalışmadı
+    assert store.load(search_params(cfg)).stage == "lowload"
+    ran = []
+    monkeypatch.setattr(cli, "cmd_run", lambda ns: ran.append(ns) or 0)
+    assert cli.cmd_lowload(cli_args(tmp_path)) == 0
+    assert len(ran) == 1 and ran[0].yes is True and ran[0].fresh is False and ran[0].simulate is False
+    assert "Yarım kalmış bir düşük yük testi" in capsys.readouterr().out
+
+
+def test_cli_lowload_resumes_during_the_idle_stage_too(tmp_path, monkeypatch):
+    cfg, store = seed_state(tmp_path, STAGE_DONE)
+    prepare_lowload(cfg, store)
+    st = store.load(search_params(cfg))
+    st.stage, st.lowload["cores_done"] = "idle", [0, 1, 2]
+    store.save(st)
+    ran = []
+    monkeypatch.setattr(cli, "cmd_run", lambda ns: ran.append(ns) or 0)
+    assert cli.cmd_lowload(cli_args(tmp_path)) == 0 and len(ran) == 1
+
+
+def test_cli_lowload_not_admin_does_not_touch_the_state(tmp_path, monkeypatch, capsys):
+    """Yönetici olmayan pencerede çalıştırılırsa durum dosyası "lowload" aşamasına geçmemeli."""
+    cfg, store = seed_state(tmp_path, STAGE_DONE)
+    before = (tmp_path / "data" / "state.json").read_bytes()
+    monkeypatch.setattr(cli, "is_admin", lambda: False)
+    monkeypatch.setattr(cli, "cmd_run", lambda ns: pytest.fail("çalışmamalıydı"))
+    assert cli.cmd_lowload(cli_args(tmp_path)) == 2
+    assert (tmp_path / "data" / "state.json").read_bytes() == before
+    assert "Yönetici" in capsys.readouterr().out
+
+
+def test_cli_lowload_starts_a_fresh_test_on_a_finished_run(tmp_path, monkeypatch):
+    cfg, store = seed_state(tmp_path, STAGE_DONE)
+    monkeypatch.setattr(cli, "is_admin", lambda: True)
+    ran = []
+    monkeypatch.setattr(cli, "cmd_run", lambda ns: ran.append(ns) or 0)
+    assert cli.cmd_lowload(cli_args(tmp_path)) == 0
+    st = store.load(search_params(cfg))
+    assert st.stage == "lowload" and st.lowload["cores_done"] == [] and len(ran) == 1
+
+
+def test_cli_lowload_still_refuses_when_the_normal_run_is_unfinished(tmp_path, monkeypatch, capsys):
+    seed_state(tmp_path, "search")
+    monkeypatch.setattr(cli, "is_admin", lambda: True)
+    monkeypatch.setattr(cli, "cmd_run", lambda ns: pytest.fail("çalışmamalıydı"))
+    assert cli.cmd_lowload(cli_args(tmp_path)) == 1
+    assert "normal çalışmanın bitmiş olması" in capsys.readouterr().out

@@ -18,6 +18,10 @@ EN = {
         'Applied (temporary, cleared on reboot): {values}',
     "Tüm çekirdeklerin CO değeri 0'a çekildi (geçici).":
         'CO of all cores set to 0 (temporary).',
+    "Aşağıdaki rapor GitHub'da paylaşılacak içeriğin TAMAMIDIR. Hiçbir şey kendiliğinden gönderilmez: GitHub sayfasında 'Submit new issue'ya sen basarsın. Gönderirsen rapor, GitHub hesap adınla birlikte HERKESE AÇIK görünür. Kullanıcı adı, bilgisayar adı ve klasör yolları çıkarılmıştır; yine de göndermeden önce oku.":
+        "The report below is the COMPLETE content that would be shared on GitHub. Nothing is sent automatically: you press 'Submit new issue' on the GitHub page yourself. If you submit it, the report is PUBLIC together with your GitHub account name. User name, computer name and folder paths have been removed; still, read it before submitting.",
+    'Raporu şuraya da kaydettim: {path}':
+        'I also saved the report here: {path}',
     "Oturum açılışında otomatik devam görevi kuruldu: '{name}'.":
         "Auto-resume task installed to run at logon: '{name}'.",
     "ÖNEMLİ: çökmeden sonra kendiliğinden devam için Windows'un otomatik oturum açması gerekir":
@@ -62,6 +66,8 @@ EN = {
         'Remove auto-resume',
     'Düşük yük / boşta kararlılık testi (lowload)':
         'Low-load / idle stability test (lowload)',
+    'Sonuçları paylaş: anonim rapor hazırla (share)':
+        'Share results: prepare an anonymous report (share)',
     '[SİMÜLASYON] gizli çekirdek limitleri: {limits}':
         '[SIMULATION] hidden core limits: {limits}',
     'Önceki durum yedeklendi: {name}':
@@ -70,6 +76,8 @@ EN = {
         'Auto-resume: starting in {sec} s (Ctrl+C to cancel)...',
     'HATA: Yönetici olarak çalıştırın (SMU erişimi için gerekli).':
         'ERROR: run as administrator (required for SMU access).',
+    'Yarım kalmış bir düşük yük testi var (aşama: {stage}, tamamlanan çekirdek: {done}). Kaldığı yerden devam ediliyor; yeni --seconds/--idle-minutes değerleri bu çalışmada kullanılmaz.':
+        'An unfinished low-load test exists (stage: {stage}, cores completed: {done}). Resuming where it left off; new --seconds/--idle-minutes values are not used for this run.',
     'Düşük yük testi için önce normal çalışmanın bitmiş olması gerekir.':
         'The normal run must be finished before the low-load test.',
     'Test edilecek CO değerleri: ':
@@ -82,6 +90,20 @@ EN = {
         'No final values to apply (search + validation must be finished).',
     'Uyarı: çalışma bitmedi (aşama: {stage}). Yine de uygulamak için --yes ekleyin.':
         'Warning: the run is not finished (stage: {stage}). Add --yes to apply anyway.',
+    'Kayıtlı çalışma yok: rapor yalnızca ortam bilgisini içeriyor (`doctor` çıktısı varsa o da eklenir).':
+        'No saved run: the report only contains environment information (plus the `doctor` output, if there is one).',
+    'Paylaşmak istersen şu adreste yeni bir issue aç ve raporu yapıştır: {url}':
+        'If you want to share it, open a new issue at this address and paste the report: {url}',
+    'Tarayıcıda GitHub sayfasını açayım mı?':
+        'Open the GitHub page in the browser?',
+    'Hiçbir şey gönderilmedi. Rapor yalnızca bilgisayarında duruyor: {path}':
+        'Nothing was sent. The report only stays on your computer: {path}',
+    'Rapor adrese sığmadığı için bazı bölümler çıkarıldı; sayfa açılınca {path} dosyasını yorum kutusuna sürükleyin.':
+        'The report did not fit in the link, so some sections were left out; once the page opens, drag the file {path} into the comment box.',
+    "GitHub sayfası açıldı. Göndermek için 'Submit new issue'ya bas; vazgeçersen sayfayı kapatman yeterli.":
+        "The GitHub page was opened. Press 'Submit new issue' to send it; to back out, just close the page.",
+    'Tarayıcı açılamadı. Şu adresi elle aç: {url}':
+        'The browser could not be opened. Open this address by hand: {url}',
     'Yalnızca Windows.':
         'Windows only.',
     'Görev oluşturulamadı (yönetici olarak çalıştırın):':
@@ -146,6 +168,12 @@ EN = {
         'seconds per core (config default: 180)',
     'boşta bekleme süresi, dk (varsayılan config: 30, 0 = atla)':
         'idle wait duration in minutes (config default: 30, 0 = skip)',
+    "anonim sonuç raporu hazırla; onaylarsan GitHub'da paylaşmak için sayfayı aç":
+        'prepare an anonymous results report; if you agree, open the GitHub page to share it',
+    'çekirdek başına CO değerlerini rapora koyma':
+        'leave the per-core CO values out of the report',
+    'tarayıcıyı açma; yalnızca raporu hazırla ve kaydet':
+        'do not open the browser; only prepare and save the report',
     "nihai değerleri geçici uygula (BIOS'a girmeden)":
         'apply the final values temporarily (without entering the BIOS)',
     'Otomatik devam atlandı: araç güvenlik için durdurulmuştu. `run --force` ile elle başlatın.':
@@ -196,6 +224,10 @@ EN = {
         'Configuration error: {e}',
     'Araç hatası: {e}':
         'Tool error: {e}',
+    'TAMAM':
+        'OK',
+    'HATA':
+        'FAIL',
     'açık':
         'on',
     'kapalı':
@@ -204,12 +236,10 @@ EN = {
         'install the auto-resume-after-crash task',
     'otomatik devam görevini sil':
         'delete the auto-resume task',
-    'TAMAM':
-        'OK',
-    'HATA':
-        'FAIL',
     'Seçim: ':
         'Choice: ',
+    '[e/H]':
+        '[y/N]',
     "language 'auto', 'tr' veya 'en' olmalı, '{value}' verildi":
         "language must be 'auto', 'tr' or 'en', got '{value}'",
     "floor 1..50 arasında olmalı (ryzen-smu-cli -50'den derinini uygulamaz)":

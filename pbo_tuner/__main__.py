@@ -9,12 +9,12 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import __version__, i18n
+from . import __version__, i18n, share
 from .config import Config, ConfigError, load_config, quick_preset
 from .hw import ToolError, WheaReader, detect_topology, is_admin, make_real_hardware, psutil
 from .i18n import mark, tr
 from .report import build_report, write_report
-from .state import STAGE_DONE, StateStore
+from .state import STAGE_DONE, STAGE_IDLE, STAGE_LOWLOAD, StateStore
 from .tuner import Halted, Tuner, prepare_lowload, search_params
 
 TASK_NAME = "PBO AutoTuner Resume"
@@ -176,9 +176,20 @@ def cmd_lowload(args) -> int:
     cfg.validate()
     store = store_for(cfg)
     st = store.load(search_params(cfg)) if store.exists() else None
+    ns = _ap.Namespace(config=args.config, quick=False, fresh=False, force=False, yes=True,
+                       auto_resume=False, simulate=False, seed=1)
+    if st is not None and st.lowload and st.stage in (STAGE_LOWLOAD, STAGE_IDLE):
+        # Daha önce hazırlanmış ama bitmemiş (ör. pencere kapandı, yönetici değildin, çökme oldu): kaldığı yerden devam
+        print(tr("Yarım kalmış bir düşük yük testi var (aşama: {stage}, tamamlanan çekirdek: {done}). "
+                 "Kaldığı yerden devam ediliyor; yeni --seconds/--idle-minutes değerleri bu çalışmada kullanılmaz.",
+                 stage=st.stage, done=len(st.lowload["cores_done"])))
+        return cmd_run(ns)
     if st is None or st.stage != STAGE_DONE or not st.final:
         print(tr("Düşük yük testi için önce normal çalışmanın bitmiş olması gerekir."))
         return 1
+    if not is_admin():                    # durum dosyasını değiştirmeden ÖNCE: yarım hazırlık bırakma
+        print(tr("HATA: Yönetici olarak çalıştırın (SMU erişimi için gerekli)."))
+        return 2
     n = len(st.final)
     est = (n * (cfg.lowload_seconds + 12) + cfg.idle_minutes * 60) // 60
     print(tr("Test edilecek CO değerleri: ") + ", ".join(f"{c}:-{a}" for c, a in sorted(st.final.items())))
@@ -193,8 +204,6 @@ def cmd_lowload(args) -> int:
     except ToolError as e:
         print(tr("Hata: {e}", e=e))
         return 1
-    ns = _ap.Namespace(config=args.config, quick=False, fresh=False, force=False, yes=True,
-                       auto_resume=False, simulate=False, seed=1)
     return cmd_run(ns)
 
 
@@ -251,6 +260,53 @@ def cmd_reset(args) -> int:
     return 0
 
 
+# ----------------------------------------------------------------------------- share
+def _confirm_open(question: str) -> bool:
+    """Varsayılan HAYIR: yalnızca açık bir 'e/evet/y/yes' kabul edilir."""
+    try:
+        return input(f"{question} {tr('[e/H]')} ").strip().lower() in ("e", "evet", "y", "yes")
+    except EOFError:
+        return False
+
+
+def cmd_share(args) -> int:
+    """Anonim bir sonuç raporu hazırlar; kullanıcı onaylarsa GitHub'da önceden doldurulmuş issue sayfasını açar."""
+    import webbrowser
+    cfg = load(args)
+    store = store_for(cfg)
+    st = store.load(search_params(cfg)) if store.exists() else None
+    pre = share.prepare(cfg, st, include_values=not args.no_values)
+    cfg.data_path.mkdir(parents=True, exist_ok=True)
+    out = cfg.data_path / share.SHARE_FILE
+    out.write_text(pre["report"], encoding="utf-8")
+    print(tr("Aşağıdaki rapor GitHub'da paylaşılacak içeriğin TAMAMIDIR. Hiçbir şey kendiliğinden gönderilmez: "
+             "GitHub sayfasında 'Submit new issue'ya sen basarsın. Gönderirsen rapor, GitHub hesap adınla birlikte "
+             "HERKESE AÇIK görünür. Kullanıcı adı, bilgisayar adı ve klasör yolları çıkarılmıştır; yine de göndermeden önce oku."))
+    print()
+    print(pre["report"])
+    print(tr("Raporu şuraya da kaydettim: {path}", path=out))
+    if st is None:
+        print(tr("Kayıtlı çalışma yok: rapor yalnızca ortam bilgisini içeriyor (`doctor` çıktısı varsa o da eklenir)."))
+    if args.no_open:
+        print(tr("Paylaşmak istersen şu adreste yeni bir issue aç ve raporu yapıştır: {url}", url=share.NEW_ISSUE_URL))
+        return 0
+    if not _confirm_open(tr("Tarayıcıda GitHub sayfasını açayım mı?")):
+        print(tr("Hiçbir şey gönderilmedi. Rapor yalnızca bilgisayarında duruyor: {path}", path=out))
+        return 0
+    if pre["trimmed"]:
+        print(tr("Rapor adrese sığmadığı için bazı bölümler çıkarıldı; sayfa açılınca {path} dosyasını yorum kutusuna sürükleyin.",
+                 path=out))
+    try:
+        opened = webbrowser.open(pre["url"])
+    except Exception:  # noqa: BLE001
+        opened = False
+    if opened:
+        print(tr("GitHub sayfası açıldı. Göndermek için 'Submit new issue'ya bas; vazgeçersen sayfayı kapatman yeterli."))
+    else:
+        print(tr("Tarayıcı açılamadı. Şu adresi elle aç: {url}", url=pre["url"]))
+    return 0
+
+
 # ----------------------------------------------------------------------------- otomatik devam
 def _bat_path() -> Path:
     return Path(__file__).resolve().parent.parent / "resume.bat"
@@ -289,12 +345,22 @@ def remove_autostart(quiet: bool = False) -> int:
 # ----------------------------------------------------------------------------- doctor
 def cmd_doctor(args) -> int:
     cfg = load(args)
+    lines: list = []
+    try:
+        return _doctor(cfg, lines)
+    finally:
+        share.save_doctor(cfg, lines)          # `share` komutu bunu (kişisel bilgiler çıkarılarak) rapora ekler
+
+
+def _doctor(cfg: Config, lines: list) -> int:
     ok_all = True
 
     def check(name: str, ok: bool, detail: str = "") -> bool:
         nonlocal ok_all
         ok_all &= ok
-        print(f"[{tr('TAMAM' if ok else 'HATA'):^5}] {name}" + (f" - {detail}" if detail else ""))
+        text = f"[{tr('TAMAM' if ok else 'HATA'):^5}] {name}" + (f" - {detail}" if detail else "")
+        print(text)
+        lines.append(text)
         return ok
 
     print(tr("PBO AutoTuner {version} ortam kontrolü", version=__version__) + "\n")
@@ -378,6 +444,7 @@ MENU = [
     (mark("Çökme sonrası otomatik devam kur"), ["install-autostart"]),
     (mark("Otomatik devamı kaldır"), ["remove-autostart"]),
     (mark("Düşük yük / boşta kararlılık testi (lowload)"), ["lowload"]),
+    (mark("Sonuçları paylaş: anonim rapor hazırla (share)"), ["share"]),
 ]
 
 
@@ -441,6 +508,10 @@ def build_parser() -> argparse.ArgumentParser:
     lw.add_argument("--idle-minutes", type=int, help=tr("boşta bekleme süresi, dk (varsayılan config: 30, 0 = atla)"))
     lw.add_argument("--yes", action="store_true")
     lw.set_defaults(fn=cmd_lowload)
+    sh = sub.add_parser("share", help=tr("anonim sonuç raporu hazırla; onaylarsan GitHub'da paylaşmak için sayfayı aç"))
+    sh.add_argument("--no-values", action="store_true", help=tr("çekirdek başına CO değerlerini rapora koyma"))
+    sh.add_argument("--no-open", action="store_true", help=tr("tarayıcıyı açma; yalnızca raporu hazırla ve kaydet"))
+    sh.set_defaults(fn=cmd_share)
     ap_apply = sub.add_parser("apply", help=tr("nihai değerleri geçici uygula (BIOS'a girmeden)"))
     ap_apply.add_argument("--yes", action="store_true")
     ap_apply.set_defaults(fn=cmd_apply)

@@ -339,6 +339,23 @@ def test_banner_is_translated():
 
 
 def test_report_recognises_warning_notes_in_both_languages():
-    from pbo_tuner.report import WARNING_PREFIXES
-    assert "UYARI: x".startswith(WARNING_PREFIXES) and "WARNING: x".startswith(WARNING_PREFIXES)
-    assert not "çökme: x".startswith(WARNING_PREFIXES)
+    from pbo_tuner.report import is_warning
+    assert is_warning("UYARI: x") and is_warning("WARNING: x")
+    assert is_warning("2026-11-01 04:28:55 UYARI: x") and is_warning("2026-11-01 04:28:55 WARNING: x")  # tarih damgalı
+    assert not is_warning("2026-11-01 04:28:55 çökme: x") and not is_warning("crash: UYARI sözcüğü içeriyor")
+
+
+@pytest.mark.parametrize("lang,header,word", [("tr", "UYARILAR:", "UYARI"), ("en", "WARNINGS:", "WARNING")])
+def test_warnings_from_real_notes_are_listed_in_the_report(lang, header, word):
+    """Gerçek olay: notlar RunState.note() ile tarih damgalı kaydedilir; uyarılar raporda görünmeli."""
+    from pbo_tuner.config import Config
+    from pbo_tuner.report import build_report
+    from pbo_tuner.state import RunState
+    from pbo_tuner.tuner import search_params
+    i18n.set_language(lang)
+    st = RunState(4, search_params(Config()))
+    st.stage, st.final = "done", {0: 10, 1: 5, 2: 0, 3: 0}
+    st.note(f"{word}: idle crash")
+    st.note("unrelated note")
+    text = build_report(st, Config())[0]
+    assert header in text and f"{word}: idle crash" in text and "unrelated note" not in text
