@@ -7,10 +7,9 @@ itself and resumes where it left off after crashes. At the end it gives you a ta
 
 > **Status:** Tested end to end on real hardware only on a **Ryzen 9 9950X3D** (the author's machine): `doctor`, quick
 > and full runs, and resuming after crashes. The search / state / crash-resume logic was also verified with a fake
-> processor and more than 300 automated tests that inject random crashes. The Zen 3 / Zen 4 presets, 12-core
-> processors and installation through `kur.bat` on a clean Windows **have not been tried on a real machine yet** (the
-> CoreCycler download step was tried on Linux with the real archive and the correct SHA-256; extracting it with
-> Windows' `tar.exe` was not tried on a real machine). The
+> processor and more than 300 automated tests that inject random crashes. The Zen 3 / Zen 4 presets and 12-core
+> processors **have not been tried on a real machine yet.** Installation through `kur.bat` was tried on a clean
+> Windows and works. The
 > `doctor` command checks every step on your machine one by one; stay at the computer for the first real run.
 
 The interface (menu, `doctor`, log, report, setup messages) is available in **English and Turkish**; see
@@ -126,6 +125,7 @@ python -m pbo_tuner report            # regenerate the report (data\report.txt, 
 python -m pbo_tuner apply             # apply the final values temporarily (cleared on reboot)
 python -m pbo_tuner reset             # set all CO values to 0 (temporary)
 python -m pbo_tuner run --simulate    # watch the algorithm on a fake processor without touching the hardware
+python -m pbo_tuner share             # prepare an anonymous report to share your results (menu 12)
 ```
 
 The recommended order is `doctor`, then `run --quick`, then the real `run`. Do not enter the `--quick` result in the
@@ -157,6 +157,10 @@ python -m pbo_tuner lowload                       # 180 s per core + 30 min idle
 python -m pbo_tuner lowload --idle-minutes 240    # a longer idle test to leave running overnight
 ```
 
+Run the command in an **administrator** command prompt. If it is interrupted (you closed the window, a crash, etc.),
+typing the same command again or choosing `3` (run) in the menu is enough: it resumes where it left off, and new
+duration values are not used for that run.
+
 1. **Light + intermittent load per core:** with all CO values applied, light AVX2-based y-cruncher tests (BKT, BBP,
    SNT) are run on every core and the process is run for ~300 ms and paused for ~700 ms (frequent idle<->load
    transitions, average load ~30%). If it fails, that core is backed off by 2 and retried.
@@ -177,6 +181,26 @@ waits at the sign-in screen after a crash (Sysinternals Autologon is recommended
 reboot), press the reset button; the tool resumes where it left off. `remove-autostart` removes the task; it is also
 removed automatically when the run finishes. The auto-resume window closes if it finishes without an error; the result
 is always in `data\report.txt`.
+
+### Sharing your results (`share`, menu 12)
+
+If you tried the tool on another processor (especially Zen 3 / Zen 4 and 12-core models), sharing the result helps
+improve it:
+
+```
+python -m pbo_tuner share              # prepare an anonymous report and show it; if you agree, open the GitHub page
+python -m pbo_tuner share --no-values  # leave the per-core CO values out of the report
+python -m pbo_tuner share --no-open    # only prepare and save it (data\share_report.txt)
+```
+
+- **Nothing is sent automatically.** The complete report is shown on screen. Only if you explicitly answer `y` does the
+  browser open a pre-filled GitHub "issue" page, and **you press "Submit new issue" yourself**. There is no server.
+- A report you submit is **public** on GitHub, shown together with your GitHub account name.
+- The report contains: tool version, Windows and Python version, processor model and generation, core count, PawnIO
+  version, the stage of the run, crash count, warnings, per-core final CO / crashes / boost difference, and the last
+  `doctor` output. User name, computer name and folder paths are removed from it; still, read it before submitting.
+- CO values belong to **that one chip**; do not apply someone else's values to your own processor. The reports are not
+  meant to distribute values, but to see which processors the tool works on and where it gets stuck.
 
 ### Making the result permanent
 
@@ -226,7 +250,7 @@ translation is added there; a test catches a missing translation) · `tests/` au
 ## Reporting problems
 
 When opening an issue, include: the processor model, the Windows version, the output of
-`python -m pbo_tuner doctor` and the relevant part of `data\tuner.log`. Results on Zen 3 / Zen 4 and on 12-core
+`python -m pbo_tuner doctor` and the relevant part of `data\tuner.log` (`python -m pbo_tuner share` prepares the environment information and the last `doctor` output for you). Results on Zen 3 / Zen 4 and on 12-core
 processors are especially valuable.
 
 ## Third-party software and licenses

@@ -15,9 +15,8 @@ Her fiziksel çekirdek için **en negatif stabil Curve Optimizer (CO)** değerin
 
 > **Durum:** Gerçek donanımda yalnızca **Ryzen 9 9950X3D** üzerinde (yazarın makinesinde) uçtan uca denendi: `doctor`,
 > hızlı ve tam çalışma, çökmeden sonra devam. Arama/durum/çökme-devam mantığı ayrıca sahte işlemciyle ve rastgele çökme
-> enjekte eden 300'den fazla otomatik testle doğrulandı. Zen 3 / Zen 4 ön ayarları, 12 çekirdekli işlemciler ve temiz bir
-> Windows'ta `kur.bat` ile kurulum **henüz gerçek makinede denenmedi** (CoreCycler indirme adımı gerçek arşiv ve doğru
-> SHA-256 ile Linux'ta denendi; Windows'un `tar.exe`'siyle açma gerçek makinede denenmedi). `doctor` komutu her adımı senin makinende tek tek
+> enjekte eden 300'den fazla otomatik testle doğrulandı. Zen 3 / Zen 4 ön ayarları ve 12 çekirdekli işlemciler **henüz gerçek makinede
+> denenmedi.** `kur.bat` ile kurulum temiz bir Windows'ta denendi ve çalışıyor. `doctor` komutu her adımı senin makinende tek tek
 > sınar; ilk gerçek çalıştırmayı başında dur.
 
 ## Sorumluluk reddi
@@ -118,6 +117,7 @@ python -m pbo_tuner report            # raporu yeniden üret (data\report.txt, r
 python -m pbo_tuner apply             # nihai değerleri geçici uygula (yeniden başlatınca silinir)
 python -m pbo_tuner reset             # tüm CO'ları 0'a çek (geçici)
 python -m pbo_tuner run --simulate    # donanıma dokunmadan algoritmayı sahte işlemcide izle
+python -m pbo_tuner share             # sonucunu anonim olarak paylaşmak için rapor hazırla (menü 12)
 ```
 
 Önce `doctor`, sonra `run --quick`, sonra asıl `run` önerilir. `--quick` sonucunu BIOS'a girme; yalnızca
@@ -145,6 +145,9 @@ python -m pbo_tuner lowload                       # çekirdek başına 180 sn + 
 python -m pbo_tuner lowload --idle-minutes 240    # gece bırakmak için daha uzun boşta testi
 ```
 
+Komutu **yönetici** komut isteminde çalıştır. Yarıda kalırsa (pencereyi kapattın, çökme oldu vb.) aynı komutu tekrar yazman
+ya da menüden `3` (run) seçmen yeterli: kaldığı yerden devam eder; yeni süre değerleri o çalışmada kullanılmaz.
+
 1. **Çekirdek başına hafif + aralıklı yük:** tüm CO değerleri uygulanmışken, her çekirdeğe AVX2 tabanlı hafif y-cruncher
    testleri (BKT, BBP, SNT) bindirilir ve süreç ~300 ms çalışıp ~700 ms durdurulur (sık boşta↔yük geçişi, ortalama yük
    ~%30). Hata verirse o çekirdek 2 geri çekilir ve yeniden denenir.
@@ -165,6 +168,26 @@ gerekir, yoksa çökmeden sonra giriş ekranında bekler (Sysinternals Autologon
 (yeniden başlamazsa) reset tuşuna bas; araç kaldığı yerden devam eder. Kurulumu `remove-autostart` kaldırır;
 çalışma bitince de otomatik kalkar. Otomatik devam penceresi hata olmadan biterse kapanır; sonuç her zaman
 `data\report.txt` içindedir.
+
+### Sonuçları paylaşma (`share`, menü 12)
+
+Aracı farklı işlemcilerde (özellikle Zen 3 / Zen 4 ve 12 çekirdekli modeller) denediysen sonucunu paylaşmak aracı
+geliştirmeye yardım eder:
+
+```
+python -m pbo_tuner share              # anonim rapor hazırla, ekranda göster; onaylarsan GitHub sayfasını aç
+python -m pbo_tuner share --no-values  # çekirdek başına CO değerlerini rapora koyma
+python -m pbo_tuner share --no-open    # yalnızca hazırla ve kaydet (data\share_report.txt)
+```
+
+- **Hiçbir şey kendiliğinden gönderilmez.** Rapor ekranda tam olarak gösterilir. Soruya açıkça `e` dersen tarayıcıda
+  önceden doldurulmuş bir GitHub "issue" sayfası açılır ve **"Submit new issue"ya sen basarsın**. Sunucu yoktur.
+- Gönderdiğin rapor GitHub'da **herkese açıktır** ve GitHub hesap adınla birlikte görünür.
+- Raporda şunlar olur: araç sürümü, Windows ve Python sürümü, işlemci modeli ve nesli, çekirdek sayısı, PawnIO sürümü,
+  çalışmanın aşaması, çökme sayısı, uyarılar, çekirdek başına nihai CO / çökme / boost farkı ve son `doctor` çıktısı.
+  Kullanıcı adı, bilgisayar adı ve klasör yolları rapordan çıkarılır; yine de göndermeden önce oku.
+- CO değerleri **o tek işlemciye özeldir**; başkasının değerlerini kendi işlemcine uygulama. Raporlar değer dağıtmak için
+  değil, aracın hangi işlemcilerde çalıştığını ve nerede takıldığını görmek içindir.
 
 ### Sonucu kalıcı yapma
 
@@ -210,7 +233,7 @@ eklenir; test eksik çeviriyi yakalar) · `tests/` otomatik testler (`python -m 
 ## Hata bildirme
 
 Sorun açarken şunları ekle: işlemci modeli, Windows sürümü, `python -m pbo_tuner doctor` çıktısı ve `data\tuner.log`
-içindeki ilgili kısım. Zen 3 / Zen 4 ve 12 çekirdekli işlemcilerdeki sonuçlar özellikle değerlidir.
+içindeki ilgili kısım (`python -m pbo_tuner share` ortam bilgisini ve son `doctor` çıktısını senin için hazırlar). Zen 3 / Zen 4 ve 12 çekirdekli işlemcilerdeki sonuçlar özellikle değerlidir.
 
 ## Üçüncü taraf yazılımlar ve lisanslar
 
