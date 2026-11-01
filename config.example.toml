@@ -1,0 +1,66 @@
+# PBO AutoTuner settings. Copy this file to config.toml and edit it.  |  PBO AutoTuner ayarları. Bu dosyayı config.toml olarak kopyalayıp düzenleyin.
+# Only [paths] corecycler_dir is required; everything else works with its defaults.  |  Yalnızca [paths] corecycler_dir zorunludur; gerisi varsayılanlarıyla da çalışır.
+
+[ui]
+# Interface language / arayüz dili:  "auto" = system language (Turkish PC -> tr, otherwise en), "tr" or "en".
+# The command-line option --lang and the PBO_LANG environment variable override this.  |  --lang ve PBO_LANG ortam değişkeni bunu geçersiz kılar.
+# language = "auto"
+
+[paths]
+# CoreCycler 0.11.x folder (must contain tools\ryzen-smu-cli and test_programs\y-cruncher).
+# CoreCycler 0.11.x klasörü (içinde tools\ryzen-smu-cli ve test_programs\y-cruncher olmalı).
+# Write the Windows path in single quotes (backslashes then need no escaping).  |  Windows yolunu tek tırnakla yazın (ters eğik çizgi sorun çıkarmaz):
+corecycler_dir = 'C:\Tools\CoreCycler'
+data_dir = "data"          # state file, log and report are written here  |  durum dosyası, log ve rapor buraya yazılır
+
+[cpu]
+# auto: detected from the Windows registry (Ryzen 5000 = zen3, 7000 = zen4, 9000 = zen5).  |  auto: işlemci kayıt defterinden algılanır.
+# If it cannot be detected, set it by hand / Algılanamazsa elle yaz: generation = "zen4"
+# generation = "auto"
+
+[search]
+# floor = 50              # DEEPEST CO to try (at most 50). Automatic if omitted: Zen 3 = 30, Zen 4/5 = 50  |  denenecek EN NEGATİF CO (en fazla 50). Yazmazsan otomatik.
+# start_co = 20          # first test is done directly at this value. Automatic if omitted: Zen 3 = 10, Zen 4 = 15, Zen 5 = 20. 0 = off  |  ilk test doğrudan bu değerde
+coarse_step = 5            # steps down from 0 in these increments  |  0'dan başlayıp bu adımlarla iner
+margin = 2                 # safety margin once the limit is found  |  sınır bulunduktan sonra güvenlik payı
+confirm_backoff = 2        # back off this much if the confirmation test fails  |  onay testi kalırsa bu kadar geri çekil
+max_crashes_per_core = 4   # after this many crashes on one core, stop exploring and use a cautious value  |  bir çekirdekte bu kadar çökmeden sonra temkinli değere geç
+max_consecutive_crashes = 8      # this many crashes in a row without any test completing => stop  |  arada hiç test tamamlanmadan üst üste bu kadar çökme => dur
+max_unattributed_reboots = 3     # this many unexpected reboots in a row outside tests => stop  |  test dışında üst üste bu kadar beklenmedik yeniden başlatma => dur
+validate_backoff = 2
+allcore_backoff = 2
+allcore_max_rounds = 4
+
+[stress]
+# mode = "24-ZN5 ~ Komari"   # y-cruncher binary. Automatic if omitted: Zen 3 = Kagari, Zen 4 = Kizuna, Zen 5 = Komari  |  y-cruncher ikilisi. Yazmazsan otomatik.
+tests = ["SFTv4", "FFTv4", "N63"]   # one "cycle" = all of these tests once  |  bir "döngü" = bu testlerin hepsi bir kez
+seconds_per_test = 20
+threads_per_core = 1       # with SMT on, 1 means a higher boost and a harsher test  |  SMT açıkken 1: çekirdek daha yüksek boost eder, test daha sert olur
+
+[levels]
+# Cycles run per level (1 cycle = len(tests) * seconds_per_test seconds)  |  Her seviyede kaç döngü koşulur
+coarse_cycles = 1          # descent steps (~60 s)  |  iniş adımları
+fine_cycles = 2            # bisection steps (~2 min)  |  ikili arama adımları
+confirm_cycles = 5         # candidate confirmation (~5 min)  |  aday onayı
+validate_cycles = 2        # per-core validation with all values applied  |  tüm değerler uygulanmışken çekirdek başı doğrulama
+allcore_minutes = 10       # all-core load test  |  tüm çekirdekler birden yük testi
+
+[safety]
+isolate_cores = false      # false (recommended): cores are tested round by round with each other's values.  |  false (önerilen): çekirdekler tur tur, birbirinin değerleriyle test edilir.
+                           # true: the other cores stay at CO 0. On a real machine this mode showed every core as 'stable' at -40,
+                           # but they failed when the others were deep too; do not use it.  |  true: diğer çekirdekler CO 0'da kalır; kullanma.
+whea_is_failure = true     # a processor WHEA event during a test = failure  |  test sırasındaki işlemci WHEA olayı = hata
+cpu_load_check = true      # the stress process not using the CPU (hung) = failure  |  stres süreci CPU kullanmıyorsa (takıldıysa) = hata
+measure_boost = true       # before/after effective MHz in the report (approximate)  |  raporda öncesi/sonrası etkin MHz (yaklaşık)
+resume_delay_seconds = 60  # wait before auto-resume so Windows can settle  |  otomatik devamda Windows'un oturması için bekleme
+
+# core_order = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]   # optional order  |  isteğe bağlı sıra
+
+[lowload]
+# `lowload` command (menu 11): light + intermittent load with the final CO values, then an idle wait.  |  `lowload` komutu (menü 11)
+lowload_seconds = 180        # seconds per core  |  çekirdek başına süre
+lowload_mode = "19-ZN2 ~ Kagari"          # AVX2 binary: lighter than AVX-512, so the core boosts higher  |  AVX2 ikilisi: AVX-512'den hafif, çekirdek daha yüksek boost eder
+lowload_tests = ["BKT", "BBP", "SNT"]     # light tests  |  hafif testler
+lowload_pulse_on_ms = 300    # load: run ~300 ms...  |  yük: ~300 ms çalış...
+lowload_pulse_off_ms = 700   # ...then stop ~700 ms (varies by 50% each round); average load ~30%  |  ...~700 ms dur; ortalama yük ~%30
+idle_minutes = 30            # idle wait duration (0 = skip). Idle failures are rare: use 240+ for an overnight run  |  boşta bekleme süresi (0 = atla); gece bırakacaksan 240+
