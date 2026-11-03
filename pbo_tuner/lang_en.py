@@ -394,6 +394,8 @@ EN = {
         "  '{name}' failed, trying the next method...",
     'config.toml zaten var, dokunulmadı.':
         'config.toml already exists, left untouched.',
+    'UYARI: config.toml içindeki corecycler_dir geçerli bir CoreCycler klasörünü göstermiyor: {path}':
+        'WARNING: corecycler_dir in config.toml does not point to a valid CoreCycler folder: {path}',
     'UYARI: config.example.toml bulunamadı; config.toml oluşturulamadı.':
         'WARNING: config.example.toml not found; could not create config.toml.',
     'config.toml oluşturuldu, CoreCycler yolu: {path}':
@@ -422,8 +424,8 @@ EN = {
         '  Extracting with {name}...',
     '  {name} ile açma başarısız (çıkış kodu {code}){detail}':
         '  Extraction with {name} failed (exit code {code}){detail}',
-    "{path} klasörü var ama eksik görünüyor; dokunulmadı. Silip kur.bat'ı yeniden çalıştırın veya CoreCycler'ı elle kurun.":
-        '{path} exists but looks incomplete; left untouched. Delete it and run kur.bat again, or install CoreCycler by hand.',
+    '{path} klasörü var ama eksik görünüyor (ör. antivirüs bir dosyayı silmiş olabilir). Onay verirsen silinmeden kenara alınır ve yeniden indirilir.':
+        '{path} exists but looks incomplete (an antivirus may have deleted a file, for example). If you agree, it is moved aside without being deleted and downloaded again.',
     'CoreCycler indirmesi atlandı. Elle indirin: https://github.com/sp00n/CoreCycler/releases':
         'CoreCycler download skipped. Download it by hand: https://github.com/sp00n/CoreCycler/releases',
     'Diskte yeterli boş yer yok (en az ~{mb} MB gerekir); CoreCycler indirilmedi.':
@@ -456,6 +458,8 @@ EN = {
         'interface language: auto (system language), tr or en',
     'psutil kuruldu ({name}).':
         'psutil installed ({name}).',
+    'config.toml içindeki corecycler_dir geçersizdi ({old}); {new} olarak güncellendi.':
+        'corecycler_dir in config.toml was invalid ({old}); updated to {new}.',
     '  indirme başarısız: {e}':
         '  download failed: {e}',
     'PawnIO sürücüsü kurulsun mu?':
@@ -464,6 +468,8 @@ EN = {
         'PawnIO installed (winget).',
     'CoreCycler indirilip kurulsun mu?':
         'Download and install CoreCycler?',
+    "Eksik klasör silinmedi, '{aside}' adıyla kenara alındı.":
+        "The incomplete folder was not deleted; it was moved aside as '{aside}'.",
     "CoreCycler açılamadı. Antivirüs dosyaları silmiş olabilir (y-cruncher / ryzen-smu-cli); istisna ekleyip tekrar deneyin ya da CoreCycler'ı elle kurun: https://github.com/sp00n/CoreCycler/releases":
         'Could not extract CoreCycler. Antivirus may have deleted files (y-cruncher / ryzen-smu-cli); add an exclusion and try again, or install CoreCycler by hand: https://github.com/sp00n/CoreCycler/releases',
     ': indirip proje klasörüne açın (CoreCycler 0.11.x): https://github.com/sp00n/CoreCycler/releases':
@@ -472,8 +478,12 @@ EN = {
         'PawnIO driver',
     ': algılanamadı (bu kontrol kesin değil). https://pawnio.eu adresinden kurun.':
         ': not detected (this check is not definitive). Install it from https://pawnio.eu.',
+    '(yok)':
+        '(none)',
     ' (sürüm {v})':
         ' (version {v})',
+    "'{path}' kenara alınamadı ({err}); CoreCycler kurulmadı.":
+        "Could not move '{path}' aside ({err}); CoreCycler was not installed.",
     'EKSİK':
         'MISSING',
     'EKSİK?':

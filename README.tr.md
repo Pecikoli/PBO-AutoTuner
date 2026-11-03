@@ -80,7 +80,8 @@ olursa durur ve senden onay ister (`run --force`).
 1. Python 3.11+ varsa kullanır; yoksa önce **winget** ile, o da yoksa python.org'dan Python 3.12'yi kullanıcı için sessizce kurar.
 2. `psutil`'i kurar (`pip`; gerekirse `ensurepip` ve `--user` ile).
 3. `config.toml` yoksa `config.example.toml`'dan üretir; proje klasörünün içinde veya yanında bir `CoreCycler*` klasörü
-   bulursa yolu otomatik yazar. Var olan `config.toml`'a dokunmaz.
+   bulursa yolu otomatik yazar. Var olan `config.toml`'a dokunmaz; yalnızca içindeki `corecycler_dir` geçersizse (ör. örnek
+   yol `C:\Tools\CoreCycler` ya da silinmiş bir klasör) ve geçerli bir CoreCycler bulunduysa yalnızca o satırı düzeltir.
 4. Hangi Python'a psutil kurulduğunu `python_path.txt`'ye yazar; `run_as_admin.bat` o Python'u kullanır.
 5. **PawnIO** sürücüsü kurulu değilse, onayını alıp kurar (ryzen-smu-cli'nin işlemciye erişmek için kullandığı imzalı
    çekirdek sürücüsü; namazso, GPL lisanslı). Önce `winget install namazso.PawnIO` denenir; olmazsa GitHub'dan
@@ -91,6 +92,8 @@ olursa durur ve senden onay ister (`run --force`).
    doğrular** ve proje klasörüne açar. `.7z` arşivini Windows'un kendi `tar.exe`'siyle (yoksa kuruluysa 7-Zip ile) açar.
    Sorulmasını istemezsen `--yes`, hiç indirilmesin istersen `--no-corecycler`. CoreCycler'ın lisansı CC BY-NC-SA 4.0'dır
    (ticari olmayan kullanım); repoya konmaz, doğrudan resmi sayfadan inen kopya kullanılır.
+   CoreCycler klasörü var ama eksikse (ör. antivirüs bir dosyayı silmişse) onayınla klasörü **silmeden**
+   `CoreCycler-v0.11.0.3.eksik-<tarih>` adıyla kenara alır ve yeniden indirir.
 
 Elle yapılması gerekenler:
 - **CoreCycler 0.11.x:** `kur.bat` indiremezse (internet yok, reddettin vb.) https://github.com/sp00n/CoreCycler/releases
@@ -219,7 +222,7 @@ altına gir (Sign = Negative, Magnitude = değer). BIOS çekirdek numarası 0'da
 | `doctor`: CO okuma hatası | PawnIO kurulu mu? CoreCycler 0.11+ mı? Yönetici misin? Defender sürücüyü engelliyor mu? |
 | `doctor`: y-cruncher log dosyası yok | Antivirüs sarmalayıcıyı (`helpers\WriteConsoleToWriteFileWrapper.exe`) engelliyor olabilir |
 | Çok sık "stres süreci CPU kullanmıyor" | `config.toml` > `[safety] cpu_load_check = false` deneyin |
-| `ARAÇ HATASI: Gerekli dosyalar bulunamadı` (veya `FileNotFoundError: [WinError 2]`) | `config.toml` içindeki `corecycler_dir` doğru klasörü gösteriyor mu? (içinde `tools\ryzen-smu-cli\ryzen-smu-cli.exe` olmalı; `C:\Tools\CoreCycler` örnek yoldur). Antivirüs dosyayı silmiş olabilir. `doctor` hangi dosyanın eksik olduğunu söyler; `kur.bat` CoreCycler'ı yeniden indirir |
+| `ARAÇ HATASI: Gerekli dosyalar bulunamadı` (veya `FileNotFoundError: [WinError 2]`) | CoreCycler eksik ya da `config.toml`'daki `corecycler_dir` yanlış. Önce `kur.bat`'ı yeniden çalıştır: CoreCycler yoksa/eksikse onayınla indirir ve geçersiz `corecycler_dir` satırını düzeltir. Olmazsa `doctor` hangi dosyanın eksik olduğunu söyler; antivirüs `ryzen-smu-cli.exe` dosyasını silmiş olabilir (istisna ekle) |
 | `kur.bat`: "CoreCycler açılamadı" | Antivirüs `y-cruncher` / `ryzen-smu-cli` dosyalarını silmiş olabilir (istisna ekle); Windows'ta `tar.exe` yoksa 7-Zip kur; ya da CoreCycler'ı elle indir |
 | `ARAÇ HATASI: y-cruncher başlamadı` (İngilizce: `TOOL ERROR: y-cruncher did not start`) | `mode` adı `test_programs\y-cruncher\Binaries` içindeki dosyayla aynı mı? |
 | Çok düşük CO değerleri | RAM/EXPO/PSU kaynaklı kararsızlık olabilir; önce onları stok yapıp dene |

@@ -13,6 +13,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import tomllib
 import urllib.request
 from pathlib import Path
 from typing import Callable, Optional
@@ -106,11 +108,38 @@ def _toml_string(path: str) -> str:
     return '"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def _configured_corecycler_dir(text: str) -> Optional[str]:
+    """config.toml metnindeki corecycler_dir değeri ([paths] altında ya da düz); okunamazsa None."""
+    try:
+        raw = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return None
+    value = (raw.get("paths") or {}).get("corecycler_dir") if isinstance(raw.get("paths"), dict) else None
+    value = value or raw.get("corecycler_dir")
+    return value if isinstance(value, str) and value else None
+
+
 def ensure_config(project: Path, corecycler: Optional[Path], log: Callable[[str], None] = print) -> str:
     """config.toml yoksa config.example.toml'dan üretir (CoreCycler yolu bulunduysa yazar). Var olanı ASLA ezmez."""
     cfg, example = project / "config.toml", project / "config.example.toml"
     if cfg.exists():
+        text = cfg.read_text(encoding="utf-8")
+        current = _configured_corecycler_dir(text)
+        if current and all((Path(current) / rel).exists() for rel in COREKEYS):
+            log(tr("config.toml zaten var, dokunulmadı."))
+            return "exists"
+        # Var olan config'te corecycler_dir geçersiz (ör. örnek yol ya da silinmiş klasör). Geçerli bir CoreCycler
+        # bulunduysa YALNIZCA o satırı düzelt; dosyanın geri kalanına dokunma.
+        pattern = r"(?m)^corecycler_dir\s*=.*$"
+        if corecycler and re.search(pattern, text):
+            cfg.write_text(re.sub(pattern, lambda m: f"corecycler_dir = {_toml_string(str(corecycler))}", text, count=1),
+                           encoding="utf-8")
+            log(tr("config.toml içindeki corecycler_dir geçersizdi ({old}); {new} olarak güncellendi.",
+                   old=current or tr("(yok)"), new=corecycler))
+            return "updated"
         log(tr("config.toml zaten var, dokunulmadı."))
+        log(tr("UYARI: config.toml içindeki corecycler_dir geçerli bir CoreCycler klasörünü göstermiyor: {path}",
+               path=current or tr("(yok)")))
         return "exists"
     if not example.exists():
         log(tr("UYARI: config.example.toml bulunamadı; config.toml oluşturulamadı."))
@@ -325,13 +354,12 @@ def ensure_corecycler(project: Path, run: Callable = subprocess.run, log: Callab
     if found:
         return found
     target = project / COREYCLER_DIRNAME
-    if target.exists():
-        log(tr("{path} klasörü var ama eksik görünüyor; dokunulmadı. Silip kur.bat'ı yeniden çalıştırın veya CoreCycler'ı elle kurun.",
-               path=target))
-        return None
     log(tr("CoreCycler bulunamadı. Resmi GitHub sürümünden indirilebilir ({url}; ~{dl} MB, açılınca ~{ex} MB)."
            , url=COREYCLER_URL, dl=COREYCLER_DOWNLOAD_MB, ex=COREYCLER_EXTRACTED_MB))
     log(tr("(sp00n; CC BY-NC-SA 4.0 lisanslı: yalnızca ticari olmayan kullanım. Bu araç onu repoya koymaz, doğrudan buradan indirir.)"))
+    if target.exists():
+        log(tr("{path} klasörü var ama eksik görünüyor (ör. antivirüs bir dosyayı silmiş olabilir). Onay verirsen silinmeden "
+               "kenara alınır ve yeniden indirilir.", path=target))
     if ask is not None and not ask(tr("CoreCycler indirilip kurulsun mu?")):
         log(tr("CoreCycler indirmesi atlandı. Elle indirin: https://github.com/sp00n/CoreCycler/releases"))
         return None
@@ -341,10 +369,20 @@ def ensure_corecycler(project: Path, run: Callable = subprocess.run, log: Callab
         return None
     archive = (Path(tmpdir) if tmpdir else Path(tempfile.gettempdir())) / f"{COREYCLER_DIRNAME}.7z"
     stage = project / COREYCLER_STAGING
+    aside: Optional[Path] = None
     try:
         log(tr("CoreCycler {version} indiriliyor (~{dl} MB)...", version=COREYCLER_VERSION, dl=COREYCLER_DOWNLOAD_MB))
         if not download_verified(COREYCLER_URL, archive, COREYCLER_SHA256, urlopen, log):
-            return None
+            return None                        # indirme/doğrulama başarısızsa eski klasöre hiç dokunulmaz
+        if target.exists():                     # doğrulanmış yeni kopya elimizde: eksik eskisini SİLMEDEN kenara al
+            aside = target.with_name(f"{target.name}.eksik-{time.strftime('%Y%m%d-%H%M%S')}")
+            try:
+                os.replace(target, aside)
+            except OSError as e:
+                log(tr("'{path}' kenara alınamadı ({err}); CoreCycler kurulmadı.", path=target, err=e))
+                aside = None
+                return None
+            log(tr("Eksik klasör silinmedi, '{aside}' adıyla kenara alındı.", aside=aside.name))
         shutil.rmtree(stage, ignore_errors=True)
         stage.mkdir(parents=True)
         log(tr("Açılıyor (~{mb} MB, bir iki dakika sürebilir)...", mb=COREYCLER_EXTRACTED_MB))
@@ -353,9 +391,15 @@ def ensure_corecycler(project: Path, run: Callable = subprocess.run, log: Callab
                    "istisna ekleyip tekrar deneyin ya da CoreCycler'ı elle kurun: https://github.com/sp00n/CoreCycler/releases"))
             return None
         os.replace(stage / COREYCLER_DIRNAME, target)
+        aside = None                            # başarılı: kenara alınan eski klasör olduğu gibi kalır
         log(tr("CoreCycler kuruldu: {path}", path=target))
         return target
     finally:
+        if aside is not None and not target.exists():   # kurulum yarıda kaldı: eski klasörü yerine koy
+            try:
+                os.replace(aside, target)
+            except OSError:
+                pass
         archive.unlink(missing_ok=True)
         shutil.rmtree(stage, ignore_errors=True)
 

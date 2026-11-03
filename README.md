@@ -84,7 +84,9 @@ tests, it stops and asks for your confirmation (`run --force`).
    and, failing that, from python.org.
 2. Installs `psutil` (`pip`; with `ensurepip` and `--user` if needed).
 3. If `config.toml` does not exist, creates it from `config.example.toml`; if it finds a `CoreCycler*` folder inside or
-   next to the project folder, it writes the path automatically. An existing `config.toml` is never touched.
+   next to the project folder, it writes the path automatically. An existing `config.toml` is not touched, except that if
+   its `corecycler_dir` is invalid (e.g. the example path `C:\Tools\CoreCycler` or a deleted folder) and a valid
+   CoreCycler was found, only that one line is corrected.
 4. Writes the Python that psutil was installed into to `python_path.txt`; `run_as_admin.bat` uses that Python.
 5. If the **PawnIO** driver is not installed, asks for your consent and installs it (the signed kernel driver that
    ryzen-smu-cli uses to reach the processor; namazso, GPL-licensed). It first tries `winget install namazso.PawnIO`;
@@ -97,6 +99,8 @@ tests, it stops and asks for your confirmation (`run --force`).
    `.7z` archive with Windows' own `tar.exe` (or with 7-Zip if that is installed). If you do not want to be asked, use
    `--yes`; to skip the download altogether, use `--no-corecycler`. CoreCycler is licensed CC BY-NC-SA 4.0
    (non-commercial use); it is not put in the repository, the copy downloaded from the official page is used.
+   If the CoreCycler folder exists but is incomplete (e.g. an antivirus deleted a file), then with your consent it is
+   moved aside **without being deleted** as `CoreCycler-v0.11.0.3.eksik-<date>` and downloaded again.
 
 What you need to do by hand:
 - **CoreCycler 0.11.x:** if `kur.bat` cannot download it (no internet, you declined, etc.), download it from
@@ -235,7 +239,7 @@ Enter the table in `data\report.txt` in the BIOS under
 | `doctor`: CO read error | Is PawnIO installed? Is it CoreCycler 0.11+? Are you an administrator? Is Defender blocking the driver? |
 | `doctor`: no y-cruncher log file | An antivirus may be blocking the wrapper (`helpers\WriteConsoleToWriteFileWrapper.exe`) |
 | Very frequent "stress process is not using the CPU" | try `config.toml` > `[safety] cpu_load_check = false` |
-| `TOOL ERROR: Required files were not found` (or `FileNotFoundError: [WinError 2]`) | Does `corecycler_dir` in `config.toml` point to the right folder? (it must contain `tools\ryzen-smu-cli\ryzen-smu-cli.exe`; `C:\Tools\CoreCycler` is only an example path). An antivirus may have deleted the file. `doctor` tells you which file is missing; `kur.bat` downloads CoreCycler again |
+| `TOOL ERROR: Required files were not found` (or `FileNotFoundError: [WinError 2]`) | CoreCycler is missing or `corecycler_dir` in `config.toml` is wrong. First run `kur.bat` again: if CoreCycler is missing/incomplete it downloads it with your consent and corrects an invalid `corecycler_dir` line. If that does not help, `doctor` tells you which file is missing; an antivirus may have deleted `ryzen-smu-cli.exe` (add an exclusion) |
 | `kur.bat`: "Could not extract CoreCycler" | An antivirus may have deleted `y-cruncher` / `ryzen-smu-cli` files (add an exclusion); install 7-Zip if Windows has no `tar.exe`; or download CoreCycler by hand |
 | `TOOL ERROR: y-cruncher did not start` | Is the `mode` name the same as a file in `test_programs\y-cruncher\Binaries`? |
 | Very low CO values | The instability may come from RAM/EXPO/PSU; set those to stock first and try again |

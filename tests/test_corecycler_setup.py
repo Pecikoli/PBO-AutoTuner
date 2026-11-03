@@ -3,6 +3,7 @@ duymaz: indirme ve açma sahte işlevlerle taklit edilir."""
 import hashlib
 import io
 import re
+import tomllib
 from collections import namedtuple
 from pathlib import Path
 from types import SimpleNamespace
@@ -213,13 +214,47 @@ def test_extraction_failure_cleans_up_and_mentions_antivirus(env):
     assert any("Antivirüs" in l for l in env.logs)
 
 
-def test_existing_incomplete_target_folder_is_never_touched(env):
+def snapshot(folder: Path):
+    return sorted(str(p.relative_to(folder)) for p in folder.rglob("*"))
+
+
+def test_incomplete_folder_is_moved_aside_never_deleted_and_reinstalled(env):
+    """Antivirüs bir dosyayı silmişse klasör "eksik" görünür: eskisi SİLİNMEDEN kenara alınır, yenisi kurulur."""
     target = env.project / se.COREYCLER_DIRNAME
     populate(env.project, complete=False)
-    before = sorted(str(p.relative_to(env.project)) for p in env.project.rglob("*"))
-    assert env.go(urlopen=lambda *a, **k: pytest.fail("indirmemeliydi")) is None
-    assert sorted(str(p.relative_to(env.project)) for p in env.project.rglob("*")) == before and target.exists()
-    assert any("dokunulmadı" in l for l in env.logs)
+    old_files = snapshot(target)
+    assert env.go() == target and se.corecycler_complete(target)
+    asides = [p for p in env.project.iterdir() if ".eksik-" in p.name]
+    assert len(asides) == 1 and snapshot(asides[0]) == old_files                # eski içerik aynen duruyor
+    assert any("kenara alındı" in l for l in env.logs)
+    assert se.find_corecycler(env.project) == target                             # eksik kopya aday sayılmaz
+
+
+def test_incomplete_folder_is_untouched_if_the_user_declines(env):
+    populate(env.project, complete=False)
+    before = snapshot(env.project)
+    assert env.go(ask=lambda q: False, urlopen=lambda *a, **k: pytest.fail("indirmemeliydi")) is None
+    assert snapshot(env.project) == before
+    assert any("eksik görünüyor" in l for l in env.logs)
+
+
+def test_incomplete_folder_is_untouched_if_the_download_fails(env):
+    populate(env.project, complete=False)
+    before = snapshot(env.project)
+
+    def broken(url, timeout=None):
+        raise OSError("bağlantı yok")
+
+    assert env.go(urlopen=broken) is None
+    assert snapshot(env.project) == before                                       # indirme olmadan taşınmaz
+
+
+def test_failed_extraction_puts_the_moved_aside_folder_back(env):
+    target = env.project / se.COREYCLER_DIRNAME
+    populate(env.project, complete=False)
+    before = snapshot(env.project)
+    assert env.go(run=env.make_run(extracts=False, code=1)) is None
+    assert snapshot(env.project) == before and target.exists()                   # her şey eski haline döndü
 
 
 def test_stale_staging_folder_from_a_previous_attempt_is_replaced(env):
@@ -290,3 +325,72 @@ def test_main_does_not_download_when_corecycler_is_already_next_to_the_project(e
     rc = se.main(str(env.project), lambda m: None, run=Combined(env.make_run()), yes=True, no_pawnio=True,
                  urlopen=lambda *a, **k: pytest.fail("indirmemeliydi"))
     assert rc == 0 and env.runs == []
+
+
+# ------------------------------------------------------------------ config.toml onarımı
+def cfg_text(path: str) -> str:
+    return f"[search]\nfloor = 45\n\n[paths]\ncorecycler_dir = '{path}'\ndata_dir = \"data\"\n"
+
+
+def test_stale_corecycler_dir_in_an_existing_config_is_repaired_and_the_rest_is_kept(env):
+    """Gerçek olay: ilk çalıştırmada CoreCycler yoktu, config örnek yolla üretildi; sonra CoreCycler kuruldu ama
+    config'teki yol eski kaldı ve araç FileNotFoundError ile düştü."""
+    populate(env.project)
+    cc = env.project / se.COREYCLER_DIRNAME
+    (env.project / "config.toml").write_text(cfg_text(r"C:\Tools\CoreCycler"), encoding="utf-8")
+    logs = []
+    assert se.ensure_config(env.project, cc, logs.append) == "updated"
+    text = (env.project / "config.toml").read_text(encoding="utf-8")
+    assert tomllib.loads(text)["paths"]["corecycler_dir"] == str(cc)
+    assert "floor = 45" in text and 'data_dir = "data"' in text                  # diğer ayarlara dokunulmadı
+    assert any("güncellendi" in l for l in logs)
+
+
+def test_valid_corecycler_dir_in_an_existing_config_is_never_changed(env, tmp_path):
+    populate(env.project)
+    other = tmp_path / "baska"
+    populate(other)
+    mine = other / se.COREYCLER_DIRNAME
+    original = cfg_text(str(mine))
+    (env.project / "config.toml").write_text(original, encoding="utf-8")
+    assert se.ensure_config(env.project, env.project / se.COREYCLER_DIRNAME, lambda s: None) == "exists"
+    assert (env.project / "config.toml").read_text(encoding="utf-8") == original
+
+
+def test_invalid_path_with_no_corecycler_available_warns_but_changes_nothing(env):
+    original = cfg_text(r"C:\Tools\CoreCycler")
+    (env.project / "config.toml").write_text(original, encoding="utf-8")
+    logs = []
+    assert se.ensure_config(env.project, None, logs.append) == "exists"
+    assert (env.project / "config.toml").read_text(encoding="utf-8") == original
+    assert any("UYARI" in l and "corecycler_dir" in l for l in logs)
+
+
+def test_config_without_a_corecycler_dir_line_is_left_alone(env):
+    populate(env.project)
+    (env.project / "config.toml").write_text("# benim ayarlarim\n", encoding="utf-8")
+    assert se.ensure_config(env.project, env.project / se.COREYCLER_DIRNAME, lambda s: None) == "exists"
+    assert (env.project / "config.toml").read_text(encoding="utf-8") == "# benim ayarlarim\n"
+
+
+def test_main_downloads_corecycler_and_repairs_the_stale_config_in_one_run(env):
+    seed_example(env.project)
+    (env.project / "config.toml").write_text(cfg_text(r"C:\Tools\CoreCycler"), encoding="utf-8")
+    logs = []
+    rc = se.main(str(env.project), logs.append, run=Combined(env.make_run()), yes=True, no_pawnio=True,
+                 urlopen=env.urlopen)
+    assert rc == 0
+    text = (env.project / "config.toml").read_text(encoding="utf-8")
+    assert tomllib.loads(text)["paths"]["corecycler_dir"] == str(env.project / se.COREYCLER_DIRNAME)
+    assert any("güncellendi" in l for l in logs)
+
+
+def test_main_repairs_config_for_an_incomplete_folder_after_reinstalling(env):
+    seed_example(env.project)
+    populate(env.project, complete=False)                                        # antivirüs bir dosyayı silmiş
+    rc = se.main(str(env.project), lambda m: None, run=Combined(env.make_run()), yes=True, no_pawnio=True,
+                 urlopen=env.urlopen)
+    assert rc == 0
+    cc = env.project / se.COREYCLER_DIRNAME
+    assert se.corecycler_complete(cc)
+    assert tomllib.loads((env.project / "config.toml").read_text(encoding="utf-8"))["paths"]["corecycler_dir"] == str(cc)
