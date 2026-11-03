@@ -89,7 +89,9 @@ olursa durur ve senden onay ister (`run --force`).
    çıkar. Sorulmasını istemezsen `python -m pbo_tuner.setup_env --yes`, hiç kurulmasın istersen `--no-pawnio`.
    Windows yeniden başlatma isterse kurulum sonunda söyler.
 6. **CoreCycler** yoksa onayını alıp resmi GitHub sürümünden (v0.11.0.3, ~45 MB; açılınca ~370 MB) indirir, **SHA-256'sını
-   doğrular** ve proje klasörüne açar. `.7z` arşivini Windows'un kendi `tar.exe`'siyle (yoksa kuruluysa 7-Zip ile) açar.
+   doğrular** ve proje klasörüne açar. `.7z` arşivini Windows'un kendi `tar.exe`'siyle (yoksa kuruluysa 7-Zip ile) açar. `tar.exe` arşivdeki adı ASCII olmayan 5
+   örnek sayı dosyasını (`Gamma(¼).txt` gibi) Windows'un dil ayarında okuyamayıp atlayabilir; bunlar çalışma için gereksizdir
+   ve gerekli her dosya açıldıysa araç bunu kabul eder.
    Sorulmasını istemezsen `--yes`, hiç indirilmesin istersen `--no-corecycler`. CoreCycler'ın lisansı CC BY-NC-SA 4.0'dır
    (ticari olmayan kullanım); repoya konmaz, doğrudan resmi sayfadan inen kopya kullanılır.
    CoreCycler klasörü var ama eksikse (ör. antivirüs bir dosyayı silmişse) onayınla klasörü **silmeden**

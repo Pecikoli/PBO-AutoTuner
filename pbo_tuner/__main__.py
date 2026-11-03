@@ -87,6 +87,11 @@ def get_hw(cfg: Config, args, log):
     return make_real_hardware(cfg, log), None
 
 
+def corecycler_dir_ok(path: str) -> bool:
+    """config.toml'daki corecycler_dir gerçekten var olan bir klasör mü? (örnek yol `C:\\Tools\\CoreCycler` genelde yoktur)"""
+    return bool(path) and Path(path).is_dir()
+
+
 def preflight(hw) -> None:
     """Çalışmaya başlamadan önce gereken programlar yerinde mi? Yoksa ham hata izi yerine anlaşılır bir hata verir."""
     missing = list(hw.stress.check_files())
@@ -383,9 +388,12 @@ def _doctor(cfg: Config, lines: list) -> int:
     check(tr("psutil kurulu"), psutil is not None, "pip install psutil" if psutil is None else "")
     if os.name != "nt" or psutil is None:
         return 1
-    check(tr("config: corecycler_dir"), bool(cfg.corecycler_dir),
-          cfg.corecycler_dir or tr("config.toml [paths] içine yazın"))
-    if not cfg.corecycler_dir:
+    dir_ok = corecycler_dir_ok(cfg.corecycler_dir)
+    check(tr("config: corecycler_dir"), dir_ok, cfg.corecycler_dir or tr("config.toml [paths] içine yazın"))
+    if not dir_ok:
+        if cfg.corecycler_dir:
+            print(tr("       Bu klasör yok. `kur.bat` CoreCycler'ı indirip config.toml'daki yolu düzeltir; ya da corecycler_dir "
+                     "satırına CoreCycler'ın gerçek klasörünü yazın (içinde tools\\ryzen-smu-cli olmalı)."))
         return 1
 
     n, smt = detect_topology(cfg.cores, cfg.smt)

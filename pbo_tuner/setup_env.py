@@ -42,7 +42,10 @@ COREYCLER_SHA256 = "721ED2948B51A2FC7C60289ECB7CBF62057B22D54C4BA5DC70AC5A107FCC
 COREYCLER_DIRNAME = "CoreCycler-v0.11.0.3"
 COREYCLER_DOWNLOAD_MB = 45
 COREYCLER_EXTRACTED_MB = 370
-COREYCLER_MIN_FILES = 300          # yarım açılmayı yakalamak için alt sınır (gerçek arşivde 447)
+# Arşivde 447 dosya var; 5'i ASCII olmayan adlı (y-cruncher\Binaries\Digits\Gamma(¼).txt gibi basamak listeleri). Windows'un
+# tar.exe'si bu adları yerel kod sayfasında okuyamayıp atlar ve çıkış kodu 1 verir; çalışma için gerekmeyen dosyalardır.
+# Geri kalan 442 dosyanın hepsi varsa açma başarılı sayılır.
+COREYCLER_MIN_FILES = 442
 COREYCLER_STAGING = ".corecycler-extract"
 
 
@@ -337,7 +340,10 @@ def extract_7z(archive: Path, dest: Path, run: Callable = subprocess.run,
             code, err = r.returncode, (r.stderr or "").strip().splitlines()
         except OSError as e:
             code, err = -1, [str(e)]
-        if code == 0 and corecycler_complete(dest / COREYCLER_DIRNAME):
+        if corecycler_complete(dest / COREYCLER_DIRNAME):
+            if code != 0:      # yalnızca adı okunamayan önemsiz dosyalar atlanmış; gerekli her şey eksiksiz açıldı
+                log(tr("  {name} bazı dosya adlarını okuyamayıp atladı (çıkış kodu {code}); gerekli her şey eksiksiz açıldı, "
+                       "devam ediliyor.", name=name, code=code))
             return True
         log(tr("  {name} ile açma başarısız (çıkış kodu {code}){detail}", name=name, code=code,
                detail=(": " + err[0]) if err else ""))

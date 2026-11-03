@@ -96,7 +96,9 @@ tests, it stops and asks for your confirmation (`run --force`).
    restart, the setup tells you at the end.
 6. If **CoreCycler** is missing, asks for your consent and downloads it from the official GitHub release (v0.11.0.3,
    ~45 MB; ~370 MB once extracted), **verifies its SHA-256** and extracts it into the project folder. It extracts the
-   `.7z` archive with Windows' own `tar.exe` (or with 7-Zip if that is installed). If you do not want to be asked, use
+   `.7z` archive with Windows' own `tar.exe` (or with 7-Zip if that is installed). `tar.exe` may skip 5 sample digit files
+   whose names are not ASCII (such as `Gamma(¼).txt`) because it cannot read them in the Windows locale; they are not
+   needed for the tool, and the setup accepts that as long as every required file was extracted. If you do not want to be asked, use
    `--yes`; to skip the download altogether, use `--no-corecycler`. CoreCycler is licensed CC BY-NC-SA 4.0
    (non-commercial use); it is not put in the repository, the copy downloaded from the official page is used.
    If the CoreCycler folder exists but is incomplete (e.g. an antivirus deleted a file), then with your consent it is

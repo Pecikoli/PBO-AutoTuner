@@ -196,6 +196,8 @@ EN = {
         'Task deleted.',
     'Görev bulunamadı/silinemedi.':
         'Task not found / could not be deleted.',
+    "       Bu klasör yok. `kur.bat` CoreCycler'ı indirip config.toml'daki yolu düzeltir; ya da corecycler_dir satırına CoreCycler'ın gerçek klasörünü yazın (içinde tools\\ryzen-smu-cli olmalı).":
+        '       This folder does not exist. `kur.bat` downloads CoreCycler and corrects the path in config.toml; or write the real CoreCycler folder into the corecycler_dir line (it must contain tools\\ryzen-smu-cli).',
     "       Not: BIOS'ta CO ayarlı. Araç test sırasında kendi değerlerini yazar; BIOS'ta 0/Auto önerilir.":
         '       Note: CO is set in the BIOS. The tool writes its own values during tests; 0/Auto in the BIOS is recommended.',
     'CO okuma/yazma':
@@ -474,6 +476,8 @@ EN = {
         'Could not extract CoreCycler. Antivirus may have deleted files (y-cruncher / ryzen-smu-cli); add an exclusion and try again, or install CoreCycler by hand: https://github.com/sp00n/CoreCycler/releases',
     ': indirip proje klasörüne açın (CoreCycler 0.11.x): https://github.com/sp00n/CoreCycler/releases':
         ': download it and extract it into the project folder (CoreCycler 0.11.x): https://github.com/sp00n/CoreCycler/releases',
+    '  {name} bazı dosya adlarını okuyamayıp atladı (çıkış kodu {code}); gerekli her şey eksiksiz açıldı, devam ediliyor.':
+        '  {name} could not read some file names and skipped them (exit code {code}); everything required was extracted completely, continuing.',
     'PawnIO sürücüsü':
         'PawnIO driver',
     ': algılanamadı (bu kontrol kesin değil). https://pawnio.eu adresinden kurun.':

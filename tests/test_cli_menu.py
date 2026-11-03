@@ -48,3 +48,13 @@ def test_run_reports_missing_tool_files_clearly_before_starting(tmp_path, monkey
     assert not started
     assert "ARAÇ HATASI" in out and "ryzen-smu-cli.exe" in out and "WriteConsoleToWriteFile" in out
     assert "corecycler_dir" in out and "doctor" in out and "kur.bat" in out
+
+
+def test_doctor_corecycler_dir_check_needs_an_existing_folder(tmp_path):
+    """Gerçek olay: örnek yol (C:\\Tools\\CoreCycler) yok olduğu halde doctor "[TAMAM] config: corecycler_dir" diyordu."""
+    assert cli.corecycler_dir_ok(str(tmp_path)) is True
+    assert cli.corecycler_dir_ok(str(tmp_path / "yok")) is False
+    assert cli.corecycler_dir_ok("") is False
+    f = tmp_path / "dosya.txt"
+    f.write_text("x")
+    assert cli.corecycler_dir_ok(str(f)) is False                      # klasör değil, dosya

@@ -137,6 +137,41 @@ def test_extract_falls_back_to_7zip_when_tar_fails_and_cleans_partial_output(env
     assert any("BCJ2" in l for l in env.logs)                                        # nedeni kullanıcıya gösterilir
 
 
+def test_tar_exit_code_1_is_accepted_when_only_unreadable_filenames_were_skipped(env, tmp_path):
+    """Gerçek olay (Türkçe Windows): tar.exe ASCII olmayan adlı 5 önemsiz dosyayı atlayıp çıkış kodu 1 verdi, kullanıcıda
+    7-Zip olduğu için kurulum yedekle tamamlandı. Gerekli her şey açılmışsa 7-Zip'e gerek kalmamalı."""
+    dest = tmp_path / "hedef"
+    dest.mkdir()
+
+    def run(cmd, **kw):
+        env.runs.append(cmd)
+        populate(dest)
+        return SimpleNamespace(returncode=1, stdout="", stderr="tar.exe: Archive entry has empty or unreadable filename ... skipping.")
+
+    assert se.extract_7z(tmp_path / "a.7z", dest, run, env.logs.append) is True
+    assert [c[0] for c in env.runs] == ["TAR.EXE"]                                # 7-Zip denenmedi bile
+    assert any("atladı" in l and "devam ediliyor" in l for l in env.logs)
+
+
+def test_tar_exit_code_1_with_missing_required_files_still_falls_back(env, tmp_path, monkeypatch):
+    monkeypatch.setattr(se, "find_7zip", lambda *a, **k: "7Z.EXE")
+    dest = tmp_path / "hedef"
+    dest.mkdir()
+
+    def run(cmd, **kw):
+        env.runs.append(cmd)
+        populate(dest, complete=(cmd[0] != "TAR.EXE"))                            # tar eksik bıraktı, 7-Zip tam açtı
+        return SimpleNamespace(returncode=1 if cmd[0] == "TAR.EXE" else 0, stdout="", stderr="tar: hata")
+
+    assert se.extract_7z(tmp_path / "a.7z", dest, run, env.logs.append) is True
+    assert [c[0] for c in env.runs] == ["TAR.EXE", "7Z.EXE"]
+
+
+def test_the_pinned_minimum_matches_the_ascii_named_files_of_the_real_archive():
+    """Gerçek arşiv: 447 dosya, 5'i ASCII olmayan adlı => 442. Bu sabit değişirse ayrıca doğrulanmalı."""
+    assert se.COREYCLER_MIN_FILES == 442
+
+
 def test_extract_rejects_an_incomplete_result_even_if_exit_code_is_zero(env, tmp_path):
     dest = tmp_path / "hedef"
     dest.mkdir()
