@@ -87,6 +87,19 @@ def get_hw(cfg: Config, args, log):
     return make_real_hardware(cfg, log), None
 
 
+def preflight(hw) -> None:
+    """Çalışmaya başlamadan önce gereken programlar yerinde mi? Yoksa ham hata izi yerine anlaşılır bir hata verir."""
+    missing = list(hw.stress.check_files())
+    smu = Path(hw.smu.exe)
+    if not smu.exists():
+        missing.insert(0, str(smu))
+    if missing:
+        raise ToolError(tr("Gerekli dosyalar bulunamadı: {files}. CoreCycler klasörü eksik ya da bozuk olabilir, "
+                           "config.toml'daki corecycler_dir yanlış olabilir veya antivirüs dosyaları silmiş olabilir. "
+                           "`python -m pbo_tuner doctor` ile kontrol edin; CoreCycler'ı yeniden kurmak için kur.bat'ı çalıştırın.",
+                           files=", ".join(missing)))
+
+
 def disable_quickedit() -> None:
     """Konsola tıklamak çıktıyı dondurur (QuickEdit). Uzun çalışmada tuner'ı bekletmesin diye kapat."""
     if os.name != "nt":
@@ -144,6 +157,7 @@ def cmd_run(args) -> int:
             if st is None:
                 return 3
         else:
+            preflight(hw)
             st = Tuner(cfg, hw, store, log=log, force=args.force).run()
     except Halted as e:
         log(tr("DURDURULDU: {e}", e=e))

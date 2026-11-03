@@ -142,3 +142,32 @@ def test_whea_relevance_filters_other_cores():
     assert [e["apic_id"] for e in got] == [12, 13, None]
     assert [e["apic_id"] for e in whea_relevant(ev, [12], smt=False)] == [12, None]
     assert len(whea_relevant(ev, list(range(32)), smt=True, all_cores=True)) == 4
+
+
+# ----------------------------------------------------------------------------- eksik program dosyası
+def test_missing_ryzen_smu_cli_gives_a_clear_tool_error_instead_of_a_traceback():
+    """Gerçek olay: corecycler_dir yanlıştı, subprocess FileNotFoundError ([WinError 2]) ham hata izi bastı."""
+    from pbo_tuner.hw import RyzenSmuCli, ToolError
+
+    calls = []
+
+    def runner(args, timeout):
+        calls.append(args)
+        raise FileNotFoundError(2, "Sistem belirtilen dosyayı bulamıyor")
+
+    smu = RyzenSmuCli(r"C:\Tools\CoreCycler\tools\ryzen-smu-cli\ryzen-smu-cli.exe", 4, runner=runner)
+    with pytest.raises(ToolError) as e:
+        smu.set_offsets([0, 0, 0, 0])
+    text = str(e.value)
+    assert "ryzen-smu-cli.exe" in text and "corecycler_dir" in text and "doctor" in text
+    assert len(calls) == 1                                              # yok olan dosya için tekrar denenmez
+
+
+def test_permission_error_is_also_reported_as_tool_error():
+    from pbo_tuner.hw import RyzenSmuCli, ToolError
+
+    def runner(args, timeout):
+        raise PermissionError(13, "Erişim engellendi")
+
+    with pytest.raises(ToolError, match="başlatılamadı"):
+        RyzenSmuCli("x.exe", 4, runner=runner).get_offsets()

@@ -70,6 +70,8 @@ EN = {
         'Share results: prepare an anonymous report (share)',
     '[SİMÜLASYON] gizli çekirdek limitleri: {limits}':
         '[SIMULATION] hidden core limits: {limits}',
+    "Gerekli dosyalar bulunamadı: {files}. CoreCycler klasörü eksik ya da bozuk olabilir, config.toml'daki corecycler_dir yanlış olabilir veya antivirüs dosyaları silmiş olabilir. `python -m pbo_tuner doctor` ile kontrol edin; CoreCycler'ı yeniden kurmak için kur.bat'ı çalıştırın.":
+        'Required files were not found: {files}. The CoreCycler folder may be missing or damaged, corecycler_dir in config.toml may be wrong, or an antivirus may have deleted the files. Check with `python -m pbo_tuner doctor`; to reinstall CoreCycler, run kur.bat.',
     'Önceki durum yedeklendi: {name}':
         'Previous state backed up: {name}',
     'Otomatik devam: {sec} sn sonra başlıyor (Ctrl+C ile iptal)...':
@@ -308,6 +310,8 @@ EN = {
         'WHEA error (idle, {n} events)',
     'WHEA hatası ({n} olay, APIC {apic})':
         'WHEA error ({n} events, APIC {apic})',
+    "ryzen-smu-cli başlatılamadı: {path} ({err}). CoreCycler klasörü eksik ya da bozuk olabilir, config.toml'daki corecycler_dir yanlış olabilir veya antivirüs dosyayı silmiş olabilir. `python -m pbo_tuner doctor` ile kontrol edin; CoreCycler'ı yeniden kurmak için kur.bat'ı çalıştırın.":
+        'ryzen-smu-cli could not be started: {path} ({err}). The CoreCycler folder may be missing or damaged, corecycler_dir in config.toml may be wrong, or an antivirus may have deleted the file. Check with `python -m pbo_tuner doctor`; to reinstall CoreCycler, run kur.bat.',
     'y-cruncher başlamadı (çıkış kodu {code}). `doctor` komutunu çalıştırın. Log: {log}':
         'y-cruncher did not start (exit code {code}). Run the `doctor` command. Log: {log}',
     'y-cruncher beklenmedik şekilde kapandı (çıkış kodu {code})':

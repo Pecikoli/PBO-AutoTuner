@@ -24,3 +24,27 @@ def test_menu_passes_config_through(monkeypatch):
     monkeypatch.setattr(cli, "main", lambda argv=None: calls.append(argv) or 0)
     cli.menu(["--config", "x.toml"])
     assert calls == [["--config", "x.toml", "doctor"]]
+
+
+def test_run_reports_missing_tool_files_clearly_before_starting(tmp_path, monkeypatch, capsys):
+    """Gerçek olay: gerekli programlar yerinde değildi; kullanıcı ham bir hata izi gördü. Artık başlamadan anlaşılır
+    bir hata verilir ve hangi dosyaların eksik olduğu yazılır."""
+    from types import SimpleNamespace
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(f"[paths]\ndata_dir = '{tmp_path / 'data'}'\n", encoding="utf-8")
+
+    class FakeStress:
+        def check_files(self):
+            return [r"C:\Tools\CoreCycler\helpers\WriteConsoleToWriteFileWrapper.exe"]
+
+    smu = SimpleNamespace(exe=r"C:\Tools\CoreCycler\tools\ryzen-smu-cli\ryzen-smu-cli.exe")
+    hw = SimpleNamespace(stress=FakeStress(), smu=smu)
+    started = []
+    monkeypatch.setattr(cli, "make_real_hardware", lambda cfg, log=None: hw)
+    monkeypatch.setattr(cli, "is_admin", lambda: True)
+    monkeypatch.setattr(cli, "Tuner", lambda *a, **k: started.append(1))
+    assert cli.main(["--config", str(cfg), "run", "--yes"]) == 4
+    out = capsys.readouterr().out
+    assert not started
+    assert "ARAÇ HATASI" in out and "ryzen-smu-cli.exe" in out and "WriteConsoleToWriteFile" in out
+    assert "corecycler_dir" in out and "doctor" in out and "kur.bat" in out

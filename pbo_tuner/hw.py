@@ -204,6 +204,11 @@ class RyzenSmuCli:
                 code, out, err = self._runner([self.exe] + args, self.timeout)
             except subprocess.TimeoutExpired:
                 last = tr("{sec:.0f} sn içinde bitmedi", sec=self.timeout)
+            except OSError as e:          # dosya yok / erişim reddedildi: tekrar denemenin anlamı yok
+                raise ToolError(tr("ryzen-smu-cli başlatılamadı: {path} ({err}). CoreCycler klasörü eksik ya da bozuk olabilir, "
+                                   "config.toml'daki corecycler_dir yanlış olabilir veya antivirüs dosyayı silmiş olabilir. "
+                                   "`python -m pbo_tuner doctor` ile kontrol edin; CoreCycler'ı yeniden kurmak için kur.bat'ı çalıştırın.",
+                                   path=self.exe, err=e)) from e
             else:
                 if code == 0 and not err.strip() and out.strip():
                     return out

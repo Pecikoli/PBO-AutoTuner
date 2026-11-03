@@ -235,6 +235,7 @@ Enter the table in `data\report.txt` in the BIOS under
 | `doctor`: CO read error | Is PawnIO installed? Is it CoreCycler 0.11+? Are you an administrator? Is Defender blocking the driver? |
 | `doctor`: no y-cruncher log file | An antivirus may be blocking the wrapper (`helpers\WriteConsoleToWriteFileWrapper.exe`) |
 | Very frequent "stress process is not using the CPU" | try `config.toml` > `[safety] cpu_load_check = false` |
+| `TOOL ERROR: Required files were not found` (or `FileNotFoundError: [WinError 2]`) | Does `corecycler_dir` in `config.toml` point to the right folder? (it must contain `tools\ryzen-smu-cli\ryzen-smu-cli.exe`; `C:\Tools\CoreCycler` is only an example path). An antivirus may have deleted the file. `doctor` tells you which file is missing; `kur.bat` downloads CoreCycler again |
 | `kur.bat`: "Could not extract CoreCycler" | An antivirus may have deleted `y-cruncher` / `ryzen-smu-cli` files (add an exclusion); install 7-Zip if Windows has no `tar.exe`; or download CoreCycler by hand |
 | `TOOL ERROR: y-cruncher did not start` | Is the `mode` name the same as a file in `test_programs\y-cruncher\Binaries`? |
 | Very low CO values | The instability may come from RAM/EXPO/PSU; set those to stock first and try again |

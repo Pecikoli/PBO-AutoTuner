@@ -219,6 +219,7 @@ altına gir (Sign = Negative, Magnitude = değer). BIOS çekirdek numarası 0'da
 | `doctor`: CO okuma hatası | PawnIO kurulu mu? CoreCycler 0.11+ mı? Yönetici misin? Defender sürücüyü engelliyor mu? |
 | `doctor`: y-cruncher log dosyası yok | Antivirüs sarmalayıcıyı (`helpers\WriteConsoleToWriteFileWrapper.exe`) engelliyor olabilir |
 | Çok sık "stres süreci CPU kullanmıyor" | `config.toml` > `[safety] cpu_load_check = false` deneyin |
+| `ARAÇ HATASI: Gerekli dosyalar bulunamadı` (veya `FileNotFoundError: [WinError 2]`) | `config.toml` içindeki `corecycler_dir` doğru klasörü gösteriyor mu? (içinde `tools\ryzen-smu-cli\ryzen-smu-cli.exe` olmalı; `C:\Tools\CoreCycler` örnek yoldur). Antivirüs dosyayı silmiş olabilir. `doctor` hangi dosyanın eksik olduğunu söyler; `kur.bat` CoreCycler'ı yeniden indirir |
 | `kur.bat`: "CoreCycler açılamadı" | Antivirüs `y-cruncher` / `ryzen-smu-cli` dosyalarını silmiş olabilir (istisna ekle); Windows'ta `tar.exe` yoksa 7-Zip kur; ya da CoreCycler'ı elle indir |
 | `ARAÇ HATASI: y-cruncher başlamadı` (İngilizce: `TOOL ERROR: y-cruncher did not start`) | `mode` adı `test_programs\y-cruncher\Binaries` içindeki dosyayla aynı mı? |
 | Çok düşük CO değerleri | RAM/EXPO/PSU kaynaklı kararsızlık olabilir; önce onları stok yapıp dene |
