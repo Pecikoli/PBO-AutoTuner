@@ -94,8 +94,7 @@ def peek_config_language(path: Optional[str]) -> Optional[str]:
         return None
     try:
         import tomllib
-        with open(path, "rb") as f:
-            raw = tomllib.load(f)
+        raw = tomllib.loads(Path(path).read_bytes().decode("utf-8-sig"))      # BOM'lu dosya da okunur (load_config gibi)
     except Exception:  # noqa: BLE001
         return None
     if isinstance(raw.get("language"), str):

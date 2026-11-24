@@ -336,7 +336,8 @@ def extract_7z(archive: Path, dest: Path, run: Callable = subprocess.run,
     for name, cmd in attempts:
         log(tr("  {name} ile açılıyor...", name=name))
         try:
-            r = run(cmd, capture_output=True, text=True)
+            # errors="replace": tar, ASCII olmayan dosya adlarını konsol kod sayfasında yazar; çözülemeyen bayt kurulumu durdurmasın
+            r = run(cmd, capture_output=True, text=True, errors="replace")
             code, err = r.returncode, (r.stderr or "").strip().splitlines()
         except OSError as e:
             code, err = -1, [str(e)]

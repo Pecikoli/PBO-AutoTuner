@@ -30,6 +30,16 @@ max_unattributed_reboots = 3     # this many unexpected reboots in a row outside
 validate_backoff = 2
 allcore_backoff = 2
 allcore_max_rounds = 4
+allcore_attrib_rounds = 3   # all-core test fails: if the WHEA APIC ID names the core, back off only that core (at most this many rounds, then everyone). 0 = off  |  tüm çekirdek testi kalınca WHEA APIC ID çekirdeği gösteriyorsa yalnızca o geri çekilir (en fazla bu kadar tur, sonra hepsi). 0 = kapalı
+
+[trim]
+# Cores that reach the tool limit (-50) WITHOUT any error have an unknown real limit. Their single-core MHz is measured at a few CO levels and the
+# shallowest CO within one boost step of the best MHz is chosen.  |  Araç sınırına (-50) hatasız inen çekirdeklerin gerçek sınırı bilinmez; tek çekirdek MHz'i birkaç CO seviyesinde ölçülür, en iyi MHz'e bir boost adımı içindeki EN SIĞ CO seçilir.
+trim_enabled = true
+trim_step = 10               # levels tried: floor, floor-10, floor-20 ...  |  denenen seviyeler
+trim_points = 5              # how many levels are measured  |  kaç seviye ölçülür
+trim_tolerance_mhz = 45      # levels within this many MHz of the best count as equivalent (~1 boost step)  |  en iyiden en fazla bu kadar düşük = eşdeğer
+trim_samples = 3             # measurements per level (median is used)  |  seviye başına ölçüm (medyan)
 
 [stress]
 # mode = "24-ZN5 ~ Komari"   # y-cruncher binary. Automatic if omitted: Zen 3 = Kagari, Zen 4 = Kizuna, Zen 5 = Komari  |  y-cruncher ikilisi. Yazmazsan otomatik.
@@ -64,3 +74,5 @@ lowload_tests = ["BKT", "BBP", "SNT"]     # light tests  |  hafif testler
 lowload_pulse_on_ms = 300    # load: run ~300 ms...  |  yük: ~300 ms çalış...
 lowload_pulse_off_ms = 700   # ...then stop ~700 ms (varies by 50% each round); average load ~30%  |  ...~700 ms dur; ortalama yük ~%30
 idle_minutes = 30            # idle wait duration (0 = skip). Idle failures are rare: use 240+ for an overnight run  |  boşta bekleme süresi (0 = atla); gece bırakacaksan 240+
+idle_max_rounds = 3          # idle test crashes/fails: back off the suspect cores and repeat, at most this many rounds (0 = off)  |  boşta test çökerse/kalırsa şüpheli çekirdekleri geri çekip tekrarla; en fazla bu kadar tur (0 = kapalı)
+idle_backoff = 2             # suspects are backed off by this much per round  |  her turda şüpheliler bu kadar geri çekilir

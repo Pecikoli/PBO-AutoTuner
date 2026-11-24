@@ -13,7 +13,7 @@ import random
 from typing import Optional
 
 from .config import Config
-from .hw import Hardware, StressResult, ToolError
+from .hw import Hardware, StressResult, ToolError, make_apic_to_core, make_cpu_to_apic
 from .i18n import tr
 from .state import StateStore
 from .tuner import Halted, Tuner
@@ -29,10 +29,16 @@ class SimCPU:
                  flaky_p_per_min: float = 0.15, allcore_penalty: int = 2, smt: bool = True,
                  spurious_crash_prob: float = 0.0, coupling: float = 0.0, cli_max: int = 50,
                  lowload_limits: Optional[list] = None, idle_fail_a: Optional[int] = None,
-                 idle_crash_prob: float = 1.0):
+                 idle_crash_prob: float = 1.0, idle_limits: Optional[list] = None, whea_visible: bool = True,
+                 fmax: Optional[list] = None, allcore_limits: Optional[list] = None):
         self.limits = list(limits)
         self.lowload_limits = list(lowload_limits) if lowload_limits is not None else list(limits)
         self.idle_fail_a, self.idle_crash_prob = idle_fail_a, idle_crash_prob
+        self.idle_limits = list(idle_limits) if idle_limits is not None else None   # çekirdek başına boşta limiti (a)
+        self.whea_visible = whea_visible      # çökmede WHEA olayı yazılır mı? (False: donma-reset, yalnızca Kernel-Power 41)
+        self.whea_log = []                    # {"t", "event_id", "apic_id"}
+        self.allcore_limits = list(allcore_limits) if allcore_limits is not None else None   # tüm çekirdek yükünde çekirdek limiti
+        self.fmax = list(fmax) if fmax is not None else None    # çekirdek başına FMAX tavanı (MHz); boost bunun üstüne çıkmaz
         self.n = len(limits)
         self.rng = random.Random(seed)
         self.crash_prob, self.band, self.flaky, self.penalty = crash_prob, band, flaky_p_per_min, allcore_penalty
@@ -46,6 +52,13 @@ class SimCPU:
         self.log = []            # (kind, core, a, seconds, outcome)
         self.crashes = 0
         self.max_a_applied_with_pass = [0] * self.n
+
+    def _whea(self, core: int) -> None:
+        """Çökmeyi yakalayan çekirdek için WHEA 18 olayı yaz (gerçek eşleme: çekirdek -> APIC)."""
+        if self.whea_visible:
+            cpu = 2 * core if self.smt else core
+            self.whea_log.append({"t": self.clock, "event_id": 18, "time": "",
+                                  "apic_id": make_cpu_to_apic(self.n, self.smt)(cpu)})
 
     # donanım olaylarını tetikler
     def reboot(self) -> None:
@@ -78,12 +91,21 @@ class SimCPU:
             def run(self, cpus, seconds, label, profile="heavy"):
                 sim.clock += seconds
                 if profile == "idle":
-                    if sim.idle_fail_a is not None and max(-o for o in sim.offsets) > sim.idle_fail_a:
+                    if sim.idle_limits is not None:
+                        bad = [c for c in range(sim.n) if -sim.offsets[c] > sim.idle_limits[c]]
+                    elif sim.idle_fail_a is not None:
+                        bad = [c for c in range(sim.n) if -sim.offsets[c] > sim.idle_fail_a]
+                    else:
+                        bad = []
+                    if bad:
+                        culprit = max(bad, key=lambda c: (-sim.offsets[c], -c))
                         if sim.rng.random() < sim.idle_crash_prob:
                             sim.crashes += 1
+                            sim._whea(culprit)
                             sim.log.append((label, [], [-o for o in sim.offsets], seconds, "IDLE-CRASH"))
                             raise SimulatedCrash()
-                        return StressResult(False, tr("sim: boşta WHEA"), seconds)
+                        sim._whea(culprit)
+                        return StressResult(False, tr("sim: boşta WHEA"), seconds, list(sim.whea_log[-1:]))
                     sim.log.append((label, [], [-o for o in sim.offsets], seconds, "idle-pass"))
                     return StressResult(True, "", seconds)
                 limits = sim.lowload_limits if profile == "light" else sim.limits
@@ -102,6 +124,8 @@ class SimCPU:
                     others = [-sim.offsets[o] for o in range(sim.n) if o != c]
                     couple = int(sim.coupling * sum(others) / max(1, len(others)))
                     a, lim = -sim.offsets[c], limits[c] - penalty - couple
+                    if penalty and profile != "light" and sim.allcore_limits is not None:
+                        lim = sim.allcore_limits[c] - couple          # yalnızca tüm çekirdek yükünde geçerli limit
                     if a > lim:
                         worst, why = ("hard", c), tr("sim: hata (çekirdek {c}, a={a}, limit={lim})", c=c, a=a, lim=lim)
                         break
@@ -116,6 +140,7 @@ class SimCPU:
                     return StressResult(True, "", seconds)
                 if worst[0] == "hard" and sim.rng.random() < sim.crash_prob:
                     sim.crashes += 1
+                    sim._whea(worst[1])
                     sim.log.append((label, cores, [-sim.offsets[c] for c in cores], seconds, "CRASH"))
                     raise SimulatedCrash()
                 sim.log.append((label, cores, [-sim.offsets[c] for c in cores], seconds, "fail"))
@@ -130,13 +155,16 @@ class SimCPU:
         class Boost:
             def measure(self, cpu):
                 c = cpu // 2 if sim.smt else cpu
-                return float(5300 - 20 * c + 12 * (-sim.offsets[c]))
+                mhz = float(5300 - 20 * c + 12 * (-sim.offsets[c]))
+                return min(mhz, float(sim.fmax[c])) if sim.fmax is not None else mhz
 
         return Boost()
 
     def hardware(self) -> Hardware:
         return Hardware(smu=self.smu, stress=self.stress, boost=self.boost, n_cores=self.n, smt=self.smt,
-                        boot_time=lambda: self.boot, now=lambda: self.clock, sleep=lambda s: None)
+                        boot_time=lambda: self.boot, now=lambda: self.clock, sleep=lambda s: None,
+                        crash_events=lambda ts: [e for e in self.whea_log if e["t"] >= ts],
+                        apic_to_core=make_apic_to_core(self.n, self.smt))
 
 
 def run_with_reboots(cfg: Config, sim: SimCPU, store: StateStore, log=print, max_boots: int = 200,

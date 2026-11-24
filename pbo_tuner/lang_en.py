@@ -324,8 +324,6 @@ EN = {
         'PBO AutoTuner result report',
     'Tarih: {date}   Aşama: {stage}   Toplam çökme: {crashes}':
         'Date: {date}   Stage: {stage}   Total crashes: {crashes}',
-    'Çekirdek  CCD   Nihai CO   Arama sonucu   Çökme   MHz önce   MHz sonra   Fark':
-        'Core     CCD   Final CO   Search found   Crash    MHz pre    MHz post   Diff',
     "BIOS'a girmek için:":
         'To enter in the BIOS:',
     "  Her çekirdek için Sign = Negative, Magnitude = aşağıdaki değer (BIOS çekirdek numarası 0'dan başlar,":
@@ -556,8 +554,6 @@ EN = {
         'extended cores backed off',
     '  tüm çekirdekler, {minutes} dk':
         '  all cores, {minutes} min',
-    '      -> KALDI ({reason}); {what} ({step})':
-        '      -> FAILED ({reason}); {what} ({step})',
     'Boşta bekleme testi: {minutes} dk, hiç yük yok, tüm CO değerleri uygulanmış.':
         'Idle wait test: {minutes} min, no load at all, all CO values applied.',
     'Aşama 5/5: nihai değerlerle boost ölçümü.':
@@ -608,4 +604,156 @@ EN = {
         'WARNING: the system crashed while idle; CO values may be unstable at idle',
     'ölçülemedi':
         'n/a',
+    '   (WHEA olayları okunamadı: {e}; tekrar denenecek)':
+        '   (could not read WHEA events: {e}; will retry)',
+    '   WHEA kaydı çökmenin kaynağını gösteriyor: çekirdek {cores} (APIC {apic}).':
+        '   The WHEA record points to the source of the crash: core {cores} (APIC {apic}).',
+    '   Çekirdek belirlenemedi: WHEA kaydı yok (donma-reset olabilir) ya da okunamadı.':
+        '   Core could not be determined: no WHEA record (could be a freeze-reset) or it could not be read.',
+    '  !! Boşta test {n} geri çekme turundan sonra da geçmedi; sonuç DOĞRULANMADI.':
+        '  !! The idle test still failed after {n} back-off rounds; result is NOT VERIFIED.',
+    '  => Çekirdek {core}: CO -{a0} -> -{pick} (MHz aynı seviyede, daha sığ = daha kararlı).':
+        '  => Core {core}: CO -{a0} -> -{pick} (same MHz level, shallower = more stable).',
+    "  => Çekirdek {core}: CO -{a0} MHz'e katkı yapıyor, olduğu gibi bırakıldı.":
+        '  => Core {core}: CO -{a0} still adds MHz, left as it is.',
+    '  => Çekirdek {core}: MHz ölçülemedi, CO -{a0} bırakıldı.':
+        '  => Core {core}: MHz could not be measured, CO -{a0} kept.',
+    '  Boşta test kaldı. {why}; geri çekiliyor: {moves}  (tur {n}/{max})':
+        '  Idle test failed. {why}; backing off: {moves}  (round {n}/{max})',
+    "  Tüm çekirdek testi: WHEA APIC ID'si çekirdeği gösteriyor; yalnızca geri çekiliyor: {moves}  (hedefli tur {n}/{max})":
+        '  All-core test: the WHEA APIC ID points to the core; backing off only: {moves}  (targeted round {n}/{max})',
+    '  {what} ({step})':
+        '  {what} ({step})',
+    '  çekirdek {core:2d}: CO -{a}: {mhz} MHz':
+        '  core {core:2d}: CO -{a}: {mhz} MHz',
+    "!! DOĞRULANMADI: aşağıdaki değerleri BIOS'a GİRMEYİN. Önce yukarıdaki nedeni giderin (ör. `lowload` komutuyla yeniden deneyin). Değerler yalnızca bilgi içindir.":
+        '!! NOT VERIFIED: do NOT enter the values below in the BIOS. Fix the reason above first (e.g. retry with the `lowload` command). The values are for information only.',
+    '-{a0} -> -{a1}':
+        '-{a0} -> -{a1}',
+    '-{a0} bırakıldı':
+        '-{a0} kept',
+    "Boşta test çökerse/kalırsa: WHEA kaydındaki APIC ID çekirdeği gösteriyorsa yalnızca o, yoksa en derin CO'lular {step} geri çekilir; düşük yük + boşta testi en fazla {rounds} tur tekrarlanır.":
+        'If the idle test crashes/fails: if the APIC ID in the WHEA record names a core, only that core, otherwise the deepest CO cores, are backed off by {step}; the low-load + idle test is repeated for at most {rounds} rounds.',
+    'DOĞRULANDI':
+        'VERIFIED',
+    'DOĞRULANMADI':
+        'NOT VERIFIED',
+    "Dikkat: sonuç KISMEN doğrulandı (yukarıdaki eksikler); BIOS'a girdikten sonra gerçek kullanımda dene.":
+        'Note: the result is only PARTIALLY verified (see the gaps above); after entering it in the BIOS, try it in real use.',
+    'KISMEN DOĞRULANDI':
+        'PARTIALLY VERIFIED',
+    "Kırpma: çekirdek {cores} araç sınırına (-{floor}) hatasız indi; gerçek sınırları bilinmiyor. MHz'e göre en sığ eşdeğer CO seçiliyor (~{minutes} dk).":
+        'Trim: cores {cores} reached the tool limit (-{floor}) without an error; their real limits are unknown. Picking the shallowest equivalent CO by MHz (~{minutes} min).',
+    "MHz'e göre kırpma (tek çekirdek boost ölçümü; çok çekirdekli yükte verim farkını ölçmez):":
+        'Trim by MHz (single-core boost measurement; it does not measure the efficiency difference under multi-core load):',
+    'SONUÇ: {verdict}':
+        'RESULT: {verdict}',
+    "Sınır 'bilinmiyor' (çekirdek {cores}): çekirdek aramada araç sınırına (-{floor}) kadar hiç hata vermeden indi; gerçek sınırı bu araçla ölçülemez. 'Nihai CO' bu çekirdeklerde bulunan sınır değil, seçilen güvenli değerdir.":
+        "Limit 'unknown' (cores {cores}): the core went down to the tool limit (-{floor}) in the search without any error; its real limit cannot be measured with this tool. 'Final CO' on these cores is the chosen safe value, not a limit that was found.",
+    "Tüm çekirdek testi geri çekmeleri: ":
+        'All-core test back-offs: ',
+    "{n} genel tur (hepsi geri çekildi)":
+        '{n} general round(s) (all cores backed off)',
+    "{n} hedefli tur (WHEA APIC ID'si çekirdeği gösterdi, yalnızca o geri çekildi)":
+        '{n} targeted round(s) (the WHEA APIC ID named the core, only that core was backed off)',
+    'UYARI: boşta kararsızlık {n} geri çekme turundan sonra da giderilemedi':
+        'WARNING: idle instability could not be fixed even after {n} back-off rounds',
+    "WHEA APIC ID'si çekirdeği gösterdi":
+        'the WHEA APIC ID named the core',
+    'WHEA APIC {apic} -> çekirdek {cores}':
+        'WHEA APIC {apic} -> core {cores}',
+    'WHEA hatası verdi':
+        'WHEA error',
+    'allcore_attrib_rounds >= 0 olmalı':
+        'allcore_attrib_rounds must be >= 0',
+    'bilinmiyor':
+        'unknown',
+    'boşta bekleme testi (aşama: idle) {what}; giderilemedi ({n} geri çekme turu denendi)':
+        'the idle wait test (stage: idle): {what}; not fixed ({n} back-off rounds tried)',
+    'boşta bekleme testi kısa ({min} dk < {need} dk); boşta kararsızlığı elemek için yetmez':
+        'the idle wait test is short ({min} min < {need} min); too short to rule out idle instability',
+    'boşta bekleme testi yapılmadı':
+        'the idle wait test was not run',
+    'boşta testi {n}. tur geri çekme ({why}): {moves}':
+        'idle test back-off round {n} ({why}): {moves}',
+    'bulundu':
+        'found',
+    'düşük yük ve boşta testleri yapılmadı (`lowload` komutu)':
+        'the low-load and idle tests were not run (`lowload` command)',
+    'yok':
+        'none',
+    'idle_max_rounds >= 0 ve idle_backoff >= 1 olmalı':
+        'idle_max_rounds must be >= 0 and idle_backoff >= 1',
+    'kaldı':
+        'failed',
+    'kırpma: çekirdek {core} CO -{a0} -> -{pick} (MHz fark <= {tol})':
+        'trim: core {core} CO -{a0} -> -{pick} (MHz difference <= {tol})',
+    'kırpma: çekirdek {core} ölçülemedi; CO -{a0} bırakıldı (gerçek sınırı bilinmiyor)':
+        'trim: core {core} could not be measured; CO -{a0} kept (real limit unknown)',
+    'sistem çöktü':
+        'system crashed',
+    'trim_step >= 1, trim_points >= 2, trim_tolerance_mhz >= 0 ve trim_samples >= 1 olmalı':
+        'trim_step must be >= 1, trim_points >= 2, trim_tolerance_mhz >= 0 and trim_samples >= 1',
+    'tüm çekirdek testi (aşama: allcore) geri çekilmelere rağmen geçmedi':
+        'the all-core test (stage: allcore) still failed despite the back-offs',
+    "tüm çekirdek testi: WHEA APIC ID'si çekirdeği gösterdi; yalnızca o geri çekildi ({moves})":
+        'all-core test: the WHEA APIC ID named the core; only that core was backed off ({moves})',
+    '{n}. boşta testi: {result}; {src}; geri çekilen: {moves}':
+        'idle run {n}: {result}; {src}; backed off: {moves}',
+    'Çekirdek  CCD   Nihai CO   Arama sonucu   Çökme   MHz önce   MHz sonra   Fark   Sınır':
+        'Core     CCD   Final CO   Search found   Crash    MHz pre    MHz post   Diff   Limit',
+    'çalışma bitmedi (aşama: {stage})':
+        'the run is not finished (stage: {stage})',
+    'çekirdek belirlenemedi (WHEA kaydı yok: donma-reset olabilir)':
+        'core could not be determined (no WHEA record: could be a freeze-reset)',
+    'çekirdek belirlenemedi (WHEA okunamadı)':
+        'core could not be determined (WHEA could not be read)',
+    "çekirdek belirlenemedi; en derin CO'lular şüpheli":
+        'core could not be determined; the deepest-CO cores are suspects',
+    'çekirdek {c}: ':
+        'core {c}: ',
+    'çekirdek {c}: ölçülemedi, -{a0} bırakıldı':
+        'core {c}: could not be measured, -{a0} kept',
+    'çökme kaynağı (WHEA APIC {apic}): çekirdek {cores}':
+        'crash source (WHEA APIC {apic}): core {cores}',
+    'çöktü':
+        'crashed',
+    'validate_backoff >= 1 ve allcore_backoff >= 1 olmalı':
+        'validate_backoff and allcore_backoff must be >= 1',
+    'max_crashes_per_core, max_consecutive_crashes ve max_unattributed_reboots >= 1 olmalı':
+        'max_crashes_per_core, max_consecutive_crashes and max_unattributed_reboots must be >= 1',
+    'allcore_minutes >= 1, allcore_max_rounds >= 0, resume_delay_seconds >= 0 ve cores >= 0 olmalı':
+        'allcore_minutes must be >= 1; allcore_max_rounds, resume_delay_seconds and cores must be >= 0',
+    'Ayar dosyası bulunamadı: {path}':
+        'Settings file not found: {path}',
+    'Ayar dosyası açılamadı: {path} ({err})':
+        'The settings file could not be opened: {path} ({err})',
+    "Ayar dosyası UTF-8 değil: {path}. Not Defteri'nde açıp 'Farklı Kaydet' ile kodlamayı UTF-8 seçerek yeniden kaydedin.":
+        "The settings file is not UTF-8: {path}. Open it in Notepad and use 'Save As' with the encoding set to UTF-8.",
+    'Ayar dosyasında yazım hatası: {path}: {err}. Windows yollarını tek tırnak içinde yazın (çift tırnak içinde ters eğik çizgi hata verir).':
+        'Syntax error in the settings file: {path}: {err}. Write Windows paths in single quotes (a backslash inside double quotes is an error).',
+    "config.toml: '{key}' için {expected} bekleniyordu, {value!r} verildi":
+        "config.toml: '{key}' expects {expected}, got {value!r}",
+    'tam sayı':
+        'a whole number',
+    'tırnak içinde metin':
+        'text in quotes',
+    'köşeli parantez içinde liste':
+        'a list in square brackets',
+    'Durum dosyası okunamadı: {path} ({err}). Dosya bozuk ya da başka bir sürüme ait olabilir. `run --fresh` eski dosyayı .bak olarak saklayıp sıfırdan başlar.':
+        'The state file could not be read: {path} ({err}). It may be corrupt or from another version. `run --fresh` keeps the old file as .bak and starts from scratch.',
+    'core_order {n} çekirdeğin her birini tam bir kez içermeli (0..{last}); verilen: {order}':
+        'core_order must list each of the {n} cores exactly once (0..{last}); got: {order}',
+    "!! ÇÖKME tespit edildi: {kind} testi (tüm çekirdekler, nihai CO değerleriyle). Bu test 'kaldı' sayılıyor.":
+        '!! CRASH detected: {kind} test (all cores, with the final CO values). This test is counted as failed.',
+    'çökme: {kind} (tüm çekirdekler)':
+        'crash: {kind} (all cores)',
+    "   Çekirdek {core} zaten CO 0'da; boost ölçümü atlandı.":
+        '   Core {core} is already at CO 0; boost measurement skipped.',
+    'UYARI: çekirdek {core} hafif yükte (boost ölçümü, CO -{a}) sistemi çökertti; CO -{new} değerine geri çekildi. Bu çekirdek hafif yüke duyarlı: düşük yük testini (`lowload`) çalıştırın.':
+        'WARNING: core {core} crashed the system under light load (boost measurement, CO -{a}); backed off to CO -{new}. This core is sensitive to light load: run the low-load test (`lowload`).',
+    '   Hafif yükte (boost ölçümü) çökme: çekirdek {core} CO -{old} -> -{new}.':
+        '   Crash under light load (boost measurement): core {core} CO -{old} -> -{new}.',
+    'Bu çalışma hızlı deneme (--quick) olarak başlatılmıştı; aynı kısa testlerle devam ediliyor. Asıl çalışma için `run --fresh` ile sıfırdan başlayın.':
+        'This run was started as a quick trial (--quick); it continues with the same short tests. For the main run, start from scratch with `run --fresh`.',
 }

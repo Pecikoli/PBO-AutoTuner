@@ -22,7 +22,7 @@ from urllib.parse import quote
 
 from . import __version__
 from .generations import GENERATIONS, classify, parse_identifier, read_cpu_identity
-from .report import build_report, is_warning
+from .report import build_report, is_warning, lowload_changes
 
 REPO = "Pecikoli/PBO-AutoTuner"
 NEW_ISSUE_URL = f"https://github.com/{REPO}/issues/new"
@@ -132,7 +132,7 @@ def format_report(info: dict, st=None, rows: Optional[list] = None, doctor: Opti
                 f"- Total crashes: {st.total_crashes}, halted: {st.halted}"]
         if st.lowload:
             idle = st.lowload.get("idle_result") or "not done"
-            changed = sum(1 for c, a in st.lowload["initial"].items() if st.final.get(int(c), 0) != a)
+            changed = len(lowload_changes(st))
             out.append(f"- Low-load test: idle result {idle}, cores backed off: {changed}")
         warns = [n for n in st.notes if is_warning(n)]
         out.append(f"- Warnings: {len(warns)}")

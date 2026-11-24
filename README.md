@@ -136,7 +136,8 @@ python -m pbo_tuner share             # prepare an anonymous report to share you
 
 The recommended order is `doctor`, then `run --quick`, then the real `run`. Do not enter the `--quick` result in the
 BIOS; it is only there to see that the system carries out the flow correctly. When it finishes, start the long run
-from scratch with `--fresh`.
+from scratch with `--fresh`. A `--quick` run that is interrupted (crash, auto-resume, or a plain `run`) continues with
+the same short tests; it only becomes the long run when you start over with `--fresh`.
 
 ### Interface language
 
@@ -170,12 +171,51 @@ duration values are not used for that run.
 1. **Light + intermittent load per core:** with all CO values applied, light AVX2-based y-cruncher tests (BKT, BBP,
    SNT) are run on every core and the process is run for ~300 ms and paused for ~700 ms (frequent idle<->load
    transitions, average load ~30%). If it fails, that core is backed off by 2 and retried.
-2. **Idle wait:** no load at all, only WHEA is watched. If the system crashes, the tool records it and warns in the
-   report; which core is responsible cannot be known. Idle failures are rare and random, so a short wait cannot rule
-   them out.
+2. **Idle wait:** no load at all, only WHEA is watched. Idle failures are rare and random, so a short wait cannot
+   rule them out; use 240+ minutes for a result you want to trust.
 
-If you get an idle crash, the ways out are: (a) back off the deepest CO values (-45/-50), (b) add voltage to the low
-frequency bands with Curve Shaper (this tool does not do that yet).
+#### What happens when the idle test crashes or fails
+
+The tool does not just warn; it tries to fix it and only calls the result verified if it passes:
+
+1. **Which core?** After the reboot (or when WHEA reports without a crash) the tool reads the WHEA 18/19 events
+   written since the test started. The *Processor APIC ID* inside the event identifies the core that raised the machine
+   check (on 8+8 chips such as the 9950X3D: core N = APIC ID 2N and 2N+1). If a core is named, only that core is
+   suspected. **If there is no WHEA record, the core is unknown and the tool does not guess:** on Zen the idle failure
+   is often a freeze followed by a reset, for which Windows writes only Kernel-Power 41 and no WHEA event. In that case
+   the deepest-CO cores (within 4 steps of the deepest, at most a third of the cores) are suspected.
+2. **Back off and retry:** the suspects are backed off by `idle_backoff` (2), their low-load test is repeated, then the
+   idle test is repeated, for at most `idle_max_rounds` (3) rounds. Each round costs one idle test (for example
+   4 hours). `idle_max_rounds = 0` turns this off.
+3. **Verdict:** see the *RESULT* line at the top of the report below.
+
+The **all-core test** uses the same attribution: if it fails or crashes and the WHEA APIC ID names a core, only that
+core is backed off by 2 (at most `allcore_attrib_rounds` = 3 rounds, then everyone as before). Without a WHEA record all
+cores are backed off together, as before.
+
+To check whether your system writes the record, run in PowerShell (read-only):
+`Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='Microsoft-Windows-WHEA-Logger';Id=18,19} -MaxEvents 10 | Select TimeCreated,Message`
+
+If the idle test still fails after all rounds, other ways out are: (a) back off the deepest CO values further, (b) add
+voltage to the low frequency bands with Curve Shaper (this tool does not do that yet).
+
+### Honest results: the verdict, the limit flag and trimming
+
+- **Verdict (top of `report.txt`).** `RESULT: VERIFIED` only if every stage finished, the all-core test passed, and the
+  low-load and idle tests passed (idle at least 60 minutes). `PARTIALLY VERIFIED`: nothing failed but a test was not run
+  or the idle wait was short. `NOT VERIFIED`: a stage failed; the report names the stage and tells you not to enter the
+  values in the BIOS. `results.json` has `verdict` and `verdict_reasons`.
+- **Limit flag (column "Limit").** A core that reaches the tool limit (-50) without an error has an *unknown* real limit.
+  "Final CO" there is a chosen safe value, not a discovered limit; the report says so.
+- **Trimming by MHz (`[trim]`, enabled by default).** For those cores the single-core boost MHz is measured at a few CO
+  levels (-50, -40, -30, -20, -10; about 10 minutes for five cores) and the *shallowest* CO within one boost step
+  (45 MHz) of the best MHz is chosen. A shallower value that already passed deeper tests is only more stable. This
+  measures single-core boost only; it cannot show an efficiency (power/temperature) gain under all-core load.
+  It runs before the low-load test; on a run finished by an older version, `lowload` trims first.
+  If the system crashes during one of these boost measurements (deep CO fails most often under light load), that core is
+  backed off by `validate_backoff` (2) below the level that crashed and is no longer trimmed: its limit has been seen.
+  A crash during the final boost measurement is handled the same way and the core is measured again. Both are listed
+  under WARNINGS in the report.
 
 ### Resuming by itself after a crash
 

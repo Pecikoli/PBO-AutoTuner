@@ -126,7 +126,9 @@ python -m pbo_tuner share             # sonucunu anonim olarak paylaşmak için 
 ```
 
 Önce `doctor`, sonra `run --quick`, sonra asıl `run` önerilir. `--quick` sonucunu BIOS'a girme; yalnızca
-sistemin akışı doğru yürüttüğünü görmek içindir. Bitince `--fresh` ile sıfırdan uzun çalışma başlat.
+sistemin akışı doğru yürüttüğünü görmek içindir. Bitince `--fresh` ile sıfırdan uzun çalışma başlat. Yarıda kalan bir
+`--quick` çalışması (çökme, otomatik devam ya da düz `run`) aynı kısa testlerle sürer; uzun çalışmaya ancak `--fresh`
+ile sıfırdan başlayınca geçilir.
 
 ### Arayüz dili (Türkçe / English)
 
@@ -156,12 +158,50 @@ ya da menüden `3` (run) seçmen yeterli: kaldığı yerden devam eder; yeni sü
 1. **Çekirdek başına hafif + aralıklı yük:** tüm CO değerleri uygulanmışken, her çekirdeğe AVX2 tabanlı hafif y-cruncher
    testleri (BKT, BBP, SNT) bindirilir ve süreç ~300 ms çalışıp ~700 ms durdurulur (sık boşta↔yük geçişi, ortalama yük
    ~%30). Hata verirse o çekirdek 2 geri çekilir ve yeniden denenir.
-2. **Boşta bekleme:** hiç yük yok, yalnızca WHEA izlenir. Sistem çökerse araç bunu kaydeder ve raporda uyarır;
-   hangi çekirdeğin sorumlu olduğu bilinemez. Boşta hata nadir ve rastgele olduğu için kısa bir bekleme onu kesin olarak
-   elemez.
+2. **Boşta bekleme:** hiç yük yok, yalnızca WHEA izlenir. Boşta hata nadir ve rastgele olduğu için kısa bir bekleme
+   onu kesin olarak elemez; güvenmek istediğin sonuç için 240+ dk kullan.
 
-Boşta çökme olursa çözüm yolları: (a) en derin CO'ları (-45/-50) geri çekmek, (b) Curve Shaper ile düşük frekans
-bantlarına voltaj eklemek (bu araç henüz yapmıyor).
+#### Boşta test çökerse ya da kalırsa
+
+Araç yalnızca uyarmaz; düzeltmeyi dener ve sonucu ancak geçerse doğrulanmış sayar:
+
+1. **Hangi çekirdek?** Yeniden başlatmadan sonra (ya da çökmeden yalnızca WHEA bildirirse) testin başladığı andan beri
+   yazılmış WHEA 18/19 olayları okunur. Olaydaki *Processor APIC ID*, makine denetimini yakalayan çekirdeği gösterir
+   (9950X3D gibi 8+8 işlemcilerde çekirdek N = APIC ID 2N ve 2N+1). Bir çekirdek gösteriliyorsa yalnızca o şüphelidir.
+   **WHEA kaydı yoksa çekirdek bilinmez ve araç tahmin etmez:** Zen'de boşta hata çoğu zaman "donma, ardından reset"
+   olarak gelir; Windows bunun için yalnızca Kernel-Power 41 yazar, WHEA olayı yazmaz. O zaman en derin CO'lu çekirdekler
+   (en derinin 4 basamak içindekiler, en çok çekirdeklerin üçte biri) şüpheli sayılır.
+2. **Geri çek ve yeniden dene:** şüpheliler `idle_backoff` (2) kadar geri çekilir, onların düşük yük testi, sonra boşta
+   testi tekrarlanır; en fazla `idle_max_rounds` (3) tur. Her tur bir boşta testi sürer (örneğin 4 saat).
+   `idle_max_rounds = 0` bunu kapatır.
+3. **Hüküm:** aşağıdaki rapor başındaki *SONUÇ* satırına bak.
+
+**Tüm çekirdek testi** de aynı atfı kullanır: kalır ya da çökerse ve WHEA APIC ID bir çekirdeği gösteriyorsa yalnızca o
+çekirdek 2 geri çekilir (en fazla `allcore_attrib_rounds` = 3 tur, sonrasında eskisi gibi hepsi). WHEA kaydı yoksa eskisi
+gibi tüm çekirdekler birlikte geri çekilir.
+
+Sisteminin kaydı yazıp yazmadığını PowerShell'de (salt okunur) şöyle kontrol edebilirsin:
+`Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='Microsoft-Windows-WHEA-Logger';Id=18,19} -MaxEvents 10 | Select TimeCreated,Message`
+
+Tüm turlardan sonra da boşta test kalırsa diğer yollar: (a) en derin CO'ları daha da geri çekmek, (b) Curve Shaper ile
+düşük frekans bantlarına voltaj eklemek (bu araç henüz yapmıyor).
+
+### Dürüst sonuç: hüküm, sınır bayrağı ve kırpma
+
+- **Hüküm (`report.txt` başı).** `SONUÇ: DOĞRULANDI` yalnızca tüm aşamalar bitmiş, tüm çekirdek testi geçmiş, düşük yük
+  ve boşta testleri geçmişse (boşta en az 60 dk) verilir. `KISMEN DOĞRULANDI`: hiçbir şey kalmadı ama bir test yapılmadı
+  ya da boşta bekleme kısa. `DOĞRULANMADI`: bir aşama kaldı; rapor aşamayı yazar ve değerleri BIOS'a girmemeni söyler.
+  `results.json` içinde `verdict` ve `verdict_reasons` var.
+- **Sınır bayrağı ("Sınır" sütunu).** Araç sınırına (-50) hatasız inen çekirdeğin gerçek sınırı *bilinmiyor*. Oradaki
+  "Nihai CO" bulunan bir sınır değil, seçilmiş güvenli bir değerdir; rapor bunu söyler.
+- **MHz'e göre kırpma (`[trim]`, varsayılan açık).** Bu çekirdeklerin tek çekirdek boost MHz'i birkaç CO seviyesinde
+  (-50, -40, -30, -20, -10; beş çekirdek için yaklaşık 10 dk) ölçülür ve en iyi MHz'e bir boost adımı (45 MHz) içinde
+  ulaşan EN SIĞ CO seçilir. Daha derin testlerden geçmiş değerin sığlaştırılması yalnızca daha kararlıdır. Bu yalnızca
+  tek çekirdek boost'unu ölçer; çok çekirdekli yükteki verim (güç/sıcaklık) kazancını gösteremez. Düşük yük testinden
+  önce çalışır; eski sürümle bitmiş çalışmada `lowload` önce kırpar.
+  Bu boost ölçümlerinden biri sırasında sistem çökerse (derin CO en çok hafif yükte çöker) o çekirdek, çöken seviyenin
+  `validate_backoff` (2) altına geri çekilir ve artık kırpılmaz: sınırı görülmüştür. Son boost ölçümündeki çökme de aynı
+  şekilde ele alınır ve çekirdek yeniden ölçülür. İkisi de raporda UYARILAR altında yazılır.
 
 ### Çökmeden sonra kendiliğinden devam
 

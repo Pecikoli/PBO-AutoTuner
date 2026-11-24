@@ -14,7 +14,7 @@ from .config import Config, ConfigError, load_config, quick_preset
 from .hw import ToolError, WheaReader, detect_topology, is_admin, make_real_hardware, psutil
 from .i18n import mark, tr
 from .report import build_report, write_report
-from .state import STAGE_DONE, STAGE_IDLE, STAGE_LOWLOAD, StateStore
+from .state import QUICK_STAGES, STAGE_DONE, STAGE_IDLE, STAGE_LOWLOAD, STAGE_TRIM, StateStore
 from .tuner import Halted, Tuner, prepare_lowload, search_params
 
 TASK_NAME = "PBO AutoTuner Resume"
@@ -131,8 +131,17 @@ def cmd_run(args) -> int:
         store.path.rename(bak)
         log(tr("Önceki durum yedeklendi: {name}", name=bak.name))
 
+    saved = store.load(search_params(cfg)) if store.exists() else None
+    if saved is not None and saved.quick and not args.quick and saved.stage in QUICK_STAGES:
+        # Hızlı deneme yarıda kaldıysa (özellikle otomatik devam: resume.bat --quick taşımaz) kalan testler uzun
+        # ayarlarla koşmasın. Donanım nesnesi kurulmadan ÖNCE uygulanmalı (y-cruncher test süresi oradan alınır).
+        # Düşük yük / boşta aşamalarında uygulanmaz: oradaki hafif testler config'teki süreyi kullanmaya devam eder.
+        quick_preset(cfg)
+        log(tr("Bu çalışma hızlı deneme (--quick) olarak başlatılmıştı; aynı kısa testlerle devam ediliyor. "
+               "Asıl çalışma için `run --fresh` ile sıfırdan başlayın."))
+
     if args.auto_resume:
-        st = store.load(search_params(cfg)) if store.exists() else None
+        st = saved
         if st is None or st.stage == STAGE_DONE:
             return 0                      # yapılacak iş yok; sessizce çık
         if st.halted:
@@ -197,7 +206,7 @@ def cmd_lowload(args) -> int:
     st = store.load(search_params(cfg)) if store.exists() else None
     ns = _ap.Namespace(config=args.config, quick=False, fresh=False, force=False, yes=True,
                        auto_resume=False, simulate=False, seed=1)
-    if st is not None and st.lowload and st.stage in (STAGE_LOWLOAD, STAGE_IDLE):
+    if st is not None and st.lowload and st.stage in (STAGE_TRIM, STAGE_LOWLOAD, STAGE_IDLE):
         # Daha önce hazırlanmış ama bitmemiş (ör. pencere kapandı, yönetici değildin, çökme oldu): kaldığı yerden devam
         print(tr("Yarım kalmış bir düşük yük testi var (aşama: {stage}, tamamlanan çekirdek: {done}). "
                  "Kaldığı yerden devam ediliyor; yeni --seconds/--idle-minutes değerleri bu çalışmada kullanılmaz.",
@@ -215,6 +224,10 @@ def cmd_lowload(args) -> int:
     print(tr("Plan: her çekirdekte ~{sec} sn hafif + aralıklı yük (tüm CO'lar uygulanmış), sonra "
              "{idle} dk boşta bekleme. Yaklaşık {est} dk.", sec=cfg.lowload_seconds, idle=cfg.idle_minutes, est=est))
     print(tr("Kalan çekirdek 2 geri çekilip yeniden denenir. Boşta beklerken bilgisayara dokunma; uyku modunu kapat."))
+    if cfg.idle_max_rounds > 0:
+        print(tr("Boşta test çökerse/kalırsa: WHEA kaydındaki APIC ID çekirdeği gösteriyorsa yalnızca o, yoksa en derin "
+                 "CO'lular {step} geri çekilir; düşük yük + boşta testi en fazla {rounds} tur tekrarlanır.",
+                 step=cfg.idle_backoff, rounds=cfg.idle_max_rounds))
     if not args.yes and not confirmed(tr("Devam etmek için EVET yaz: ")):
         print(tr("İptal edildi."))
         return 1
@@ -293,7 +306,11 @@ def cmd_share(args) -> int:
     import webbrowser
     cfg = load(args)
     store = store_for(cfg)
-    st = store.load(search_params(cfg)) if store.exists() else None
+    try:
+        st = store.load(search_params(cfg)) if store.exists() else None
+    except ToolError as e:               # bozuk durum dosyası sorun bildirmeyi engellemesin: yalnızca ortam bilgisiyle devam
+        print(tr("Araç hatası: {e}", e=e))
+        st = None
     pre = share.prepare(cfg, st, include_values=not args.no_values)
     cfg.data_path.mkdir(parents=True, exist_ok=True)
     out = cfg.data_path / share.SHARE_FILE
@@ -331,15 +348,27 @@ def _bat_path() -> Path:
     return Path(__file__).resolve().parent.parent / "resume.bat"
 
 
+def resume_bat_text(root: Path, python: str, cfg_path: str | None) -> str:
+    """resume.bat içeriği (CRLF satır sonlu). Yollar ASCII dışı harf içerebilir (ör. Türkçe kullanıcı adının altındaki
+    Python): dosya UTF-8 yazılır ve ilk iş `chcp 65001` ile cmd'ye bu söylenir; yoksa cmd dosyayı OEM kod sayfasıyla
+    okuyup yolu bozar ve otomatik devam hiç başlamaz. `%` .bat içinde değişken başlatır; yolda geçiyorsa ikilenir."""
+    def esc(p) -> str:
+        return str(p).replace("%", "%%")
+
+    cfg_arg = f' --config "{esc(Path(cfg_path).resolve())}"' if cfg_path else ""
+    return "\r\n".join(["@echo off", "chcp 65001 >nul", f'cd /d "{esc(root)}"',
+                        f'"{esc(python)}" -m pbo_tuner run --auto-resume{cfg_arg}', "if errorlevel 1 pause", ""])
+
+
 def install_autostart(cfg_path: str | None) -> int:
     if os.name != "nt":
         print(tr("Yalnızca Windows."))
         return 1
     import subprocess
     root = Path(__file__).resolve().parent.parent
-    cfg_arg = f' --config "{Path(cfg_path).resolve()}"' if cfg_path else ""
     bat = _bat_path()
-    bat.write_text(f'@echo off\r\ncd /d "{root}"\r\n"{sys.executable}" -m pbo_tuner run --auto-resume{cfg_arg}\r\nif errorlevel 1 pause\r\n')
+    # write_bytes: metin kipinde "\r\n" -> "\r\r\n" olur ve yerel kod sayfası kullanılırdı
+    bat.write_bytes(resume_bat_text(root, sys.executable, cfg_path).encode("utf-8"))
     r = subprocess.run(["schtasks", "/Create", "/TN", TASK_NAME, "/SC", "ONLOGON", "/RL", "HIGHEST",
                         "/DELAY", "0000:30", "/F", "/TR", f'"{bat}"'], capture_output=True, text=True)
     if r.returncode != 0:
@@ -562,6 +591,10 @@ def main(argv=None) -> int:
     except ToolError as e:
         print(tr("Araç hatası: {e}", e=e))
         return 4
+    except KeyboardInterrupt:           # doctor/apply/lowload onayı vb. sırasında Ctrl+C: ham hata izi yerine temiz çıkış
+        print()
+        print(tr("İptal edildi."))
+        return 130
 
 
 if __name__ == "__main__":

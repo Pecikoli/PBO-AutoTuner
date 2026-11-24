@@ -108,7 +108,7 @@ def test_ensure_config_without_corecycler_warns_and_keeps_placeholder(tmp_path):
 
 
 def test_toml_string_handles_apostrophes_and_windows_paths():
-    for path in (r"C:\Users\Example\Desktop\pbo_autotuner\CoreCycler-v0.11.0.3", r"C:\Users\O'Brien\CoreCycler", 'C:\\a "b"\\c'):
+    for path in (r"C:\Users\PC\Desktop\pbo_autotuner\CoreCycler-v0.11.0.3", r"C:\Users\O'Brien\CoreCycler", 'C:\\a "b"\\c'):
         assert tomllib.loads(f"x = {se._toml_string(path)}")["x"] == path
 
 
@@ -208,7 +208,9 @@ def test_pawnio_constants_are_pinned_and_well_formed():
     assert se.PAWNIO_VERSION in se.PAWNIO_URL and se.PAWNIO_WINGET_ID == "namazso.PawnIO"
 
 
-def test_pawnio_unsupported_outside_windows():
+def test_pawnio_unsupported_outside_windows(monkeypatch):
+    # os.name taklit edilir: test Windows'ta da koşabilsin (orada gerçek kayıt defterine bakıp "present" dönüyordu)
+    monkeypatch.setattr(se, "os", types.SimpleNamespace(name="posix", environ={}))
     assert se.ensure_pawnio(run=FakeRun(), log=lambda s: None) == "unsupported"
 
 

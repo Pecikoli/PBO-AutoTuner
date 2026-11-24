@@ -137,6 +137,22 @@ def make_cpu_to_apic(n_cores: int, smt: bool) -> Callable[[int], int]:
     return f
 
 
+def make_apic_to_core(n_cores: int, smt: bool) -> Callable[[int], Optional[int]]:
+    """APIC ID -> fiziksel çekirdek (make_cpu_to_apic'in tersi). Eşleşmeyen (boşluktaki ya da aralık dışı) APIC ID
+    için None döner: o zaman çekirdek atfı yapılmaz, tahmin edilmez."""
+    per_ccd = n_cores // 2 if n_cores > 8 else n_cores
+
+    def f(apic: int) -> Optional[int]:
+        slot = apic // 2 if smt else apic
+        ccd, idx = divmod(slot, 8)
+        if idx >= per_ccd:
+            return None
+        core = ccd * per_ccd + idx
+        return core if core < n_cores else None
+
+    return f
+
+
 def whea_relevant(events: list, cpus: list, smt: bool, all_cores: bool = False,
                   cpu_to_apic: Optional[Callable[[int], int]] = None) -> list:
     """Sadece test edilen çekirdeğe ait (APIC ID eşleşen) olayları tut. APIC ID okunamadıysa temkinli sayılır
@@ -194,7 +210,9 @@ class RyzenSmuCli:
 
     @staticmethod
     def _subprocess_runner(args: list, timeout: float):
-        p = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        # errors="replace": hata metni konsolun kod sayfasında gelir; yerel kod sayfasında tanımsız bir bayt
+        # (ör. cp857 'Ş' = 0x9E, cp1254'te yok) UnicodeDecodeError ile tüm çalışmayı durdurmasın
+        p = subprocess.run(args, capture_output=True, text=True, errors="replace", timeout=timeout)
         return p.returncode, p.stdout, p.stderr
 
     def _run(self, args: list) -> str:
@@ -240,10 +258,18 @@ class RyzenSmuCli:
 
 class WheaReader:
     def events_since(self, since: datetime) -> list:
-        p = subprocess.run(build_wevtutil_args(since), capture_output=True, text=True, timeout=30)
+        # Çıktı konsolun kod sayfasındadır (bilgisayar adı ASCII dışı olabilir: <Computer>ŞAHİN-PC</Computer>); bize
+        # gereken alanlar (olay kimliği, zaman, APIC ID) ASCII'dir, bu yüzden çözülemeyen baytlar yer tutucuyla değiştirilir.
+        try:
+            p = subprocess.run(build_wevtutil_args(since), capture_output=True, text=True, errors="replace", timeout=30)
+        except (OSError, subprocess.TimeoutExpired) as e:      # ham hata izi yerine araç hatası (çağıranlar bunu bekler)
+            raise ToolError(tr("wevtutil başarısız: {err}", err=e)) from e
         if p.returncode != 0:
             raise ToolError(tr("wevtutil başarısız: {err}", err=p.stderr.strip()))
-        return parse_wevtutil_xml(p.stdout)
+        try:
+            return parse_wevtutil_xml(p.stdout)
+        except ET.ParseError as e:
+            raise ToolError(tr("wevtutil başarısız: {err}", err=e)) from e
 
 
 # =====================================================================================
@@ -567,6 +593,10 @@ class Hardware:
     boot_time: Callable[[], float]
     now: Callable[[], float] = time.time
     sleep: Callable[[float], None] = time.sleep
+    # Çökme sonrası atıf: crash_events(ts) -> ts (epoch sn) sonrasındaki WHEA CPU olayları (ayrıştırılmış);
+    # apic_to_core(apic) -> çekirdek ya da None. İkisi de yoksa çekirdek atfı yapılmaz.
+    crash_events: Optional[Callable[[float], list]] = None
+    apic_to_core: Optional[Callable[[int], Optional[int]]] = None
 
     def cpus_for_core(self, core: int, threads: int = 1) -> list:
         if self.smt:
@@ -612,4 +642,6 @@ def make_real_hardware(cfg, log: Callable[[str], None] = print) -> Hardware:
                              light_tests=cfg.lowload_tests, pulse_on_ms=cfg.lowload_pulse_on_ms,
                              pulse_off_ms=cfg.lowload_pulse_off_ms, cpu_to_apic=make_cpu_to_apic(n_cores, smt))
     return Hardware(smu=smu, stress=stress, boost=BoostMeter(), n_cores=n_cores, smt=smt,
-                    boot_time=psutil.boot_time)
+                    boot_time=psutil.boot_time,
+                    crash_events=lambda ts: whea.events_since(datetime.fromtimestamp(ts, timezone.utc)),
+                    apic_to_core=make_apic_to_core(n_cores, smt))

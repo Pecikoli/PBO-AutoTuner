@@ -97,8 +97,10 @@ def test_crash_during_lowload_is_recorded_and_resumed(tmp_path):
     assert st.total_crashes >= 1
 
 
-def test_idle_crash_is_reported_but_values_are_not_changed(tmp_path):
+def test_idle_crash_with_remediation_disabled_is_only_reported(tmp_path):
+    """idle_max_rounds = 0: eski davranış. Boşta çökme yalnızca raporlanır, değerler değişmez."""
     cfg, sim, store, st0 = finished_run(tmp_path, LIMITS, seed=4, crash_prob=0.0, band=0, allcore_penalty=0)
+    cfg.idle_max_rounds = 0
     before = dict(st0.final)
     sim.idle_fail_a, sim.idle_crash_prob = 40, 1.0           # bazı çekirdekler 40'tan derinde: boşta çöker
     assert max(before.values()) > 40
